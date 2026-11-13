@@ -22,8 +22,8 @@
   --airbnb-soft: #fbe3e3;
   --booking: #1d4f91;
   --booking-soft: #dfe8f5;
-  --direct: #c4622d;
-  --direct-soft: #f6e2d6;
+  --website: #c4622d;
+  --website-soft: #f6e2d6;
   --manual: #6b7f4e;
   --manual-soft: #e7ecdc;
 
@@ -61,5 +61,5 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .chip::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .chip.airbnb { background: var(--airbnb-soft); color: var(--airbnb); }
 .chip.booking { background: var(--booking-soft); color: var(--booking); }
-.chip.direct { background: var(--direct-soft); color: var(--direct); }
+.chip.website { background: var(--website-soft); color: var(--website); }
 .chip.manual { background: var(--manual-soft); color: var(--manual); }

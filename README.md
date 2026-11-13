@@ -2,56 +2,65 @@
 
 **Every booking, one porch.**
 
-*Alpendre* is Portuguese for porch, the place where every guest arrives, whatever road they took to get there. Alpendre puts the reservations for your holiday house from **Airbnb**, **Booking.com** and **your own website** on one calendar.
-
-![logo](public/logo.svg)
+*Alpendre* is Portuguese for porch, the place where every guest arrives, whatever road they took to get there. Alpendre is a platform for managing several holiday houses. Each house is its own **workspace**, connected to **Airbnb**, **Booking.com** and **your own website**, with calendars kept in sync and every reservation in one place.
 
 ## What's inside
 
 | | |
 |---|---|
-| **Guest website** (`/`) | A booking page for the house: description, amenities, a live availability calendar, a price quote and a booking form. Direct bookings, no commission. |
-| **Host dashboard** (`/admin/`) | Overview (occupancy, revenue, arrivals and departures, alerts), a calendar of every channel, a searchable list of reservations, channel connections and property settings. |
-| **Two-way calendar sync** | Imports Airbnb and Booking.com calendars over iCal and publishes a calendar link back to each one, so a night sold anywhere is blocked everywhere. |
-| **Double-booking alerts** | Overlapping stays are flagged in red on the dashboard and the calendar. |
+| **Houses home** | Every house as a card (occupancy, tonight's status, next arrival, connection health), a timeline of all houses side by side, arrivals and departures across houses, and a "needs attention" list. |
+| **A workspace per house** | Overview, month calendar, reservations, connections and settings, kept separate for each house. |
+| **Airbnb & Booking.com** | Two-way calendar sync (iCal): imports their bookings and gives each one a link that blocks nights sold elsewhere. |
+| **Your existing website** | Three ways to connect it (below), so nights sold on your site block Airbnb and Booking.com, and the other way round. |
+| **Double-booking alerts** | Overlapping stays in a house are flagged in red everywhere. |
 
 ## Run it
 
-Requires Node.js 18 or newer. There are no dependencies to install.
+Requires Node.js 18 or newer. There are no dependencies.
 
 ```bash
 npm start
 ```
 
-- Guest website: http://localhost:4300/
-- Host dashboard: http://localhost:4300/admin/ (default password `alpendre`)
-
-Set your own password and port:
+Open http://localhost:4300/ (default password `alpendre`). Set your own:
 
 ```bash
 ALPENDRE_PASSWORD="choose-a-strong-one" PORT=8080 npm start
 ```
 
-On first run it loads demo reservations so you can look around. Remove them under **Property & site → Remove demo reservations**.
+The first run loads three demo houses. Remove them under **Settings → Remove demo houses**. Data is stored in `data/db.json`, so back it up.
 
-Data is stored in `data/db.json`. Back this file up.
+## Connecting a house
 
-## Connecting Airbnb and Booking.com
+Open a house, then **Connections**.
 
-Neither platform offers an open API to small hosts. The tool both of them do support is **calendar sync (iCal)**, and Alpendre uses it in both directions:
+### Airbnb and Booking.com
+Neither platform offers an open API to small hosts. Both support **calendar sync (iCal)**:
 
-1. **Import:** in Airbnb (*Calendar → Availability → Connect calendars → Export*) and in the Booking.com extranet (*Rates & Availability → Sync calendars → Export*), copy the calendar link and paste it under **Channels** in Alpendre.
-2. **Export:** copy the Alpendre link shown on each channel card and paste it into that platform's *Import calendar* option.
+1. **Import:** copy the export link from Airbnb (*Calendar → Availability → Connect calendars → Export*) or the Booking.com extranet (*Rates & Availability → Sync calendars → Export*) and paste it into Alpendre.
+2. **Export:** copy Alpendre's link for that channel and paste it into the platform's *Import calendar*.
 
-Alpendre checks both platforms every 30 minutes by default. You can change that, or press **Sync now**.
+Their calendars only carry dates and a reference, not guest names or prices. Alpendre imports the dates. You add guest details, and Alpendre keeps them on every later sync. A stay that disappears from a channel is marked cancelled.
 
-**What iCal does not include:** the calendars only carry dates and a reservation reference, not guest names or prices. Alpendre imports the dates and lets you add guest details to each stay. Those details are kept on every later sync. If a stay disappears from a channel's calendar, Alpendre marks it as cancelled.
+### Your website
+Pick whichever fits how the site is built:
 
-To get full guest and price data automatically you would need a certified channel-manager connection (Airbnb's and Booking.com's partner APIs), which requires a partnership with each platform.
+| Option | When to use it | How |
+|---|---|---|
+| **Booking widget** | The site has no booking system (WordPress, Wix, Squarespace, plain HTML) | Paste the two-line snippet. It shows live availability and sends booking requests into Alpendre. Add `data-mode="calendar"` for availability only, or `data-accent="#hex"` to match your colours. |
+| **Calendar sync** | The site already has a booking plugin that offers an iCal link | Import the site's link into Alpendre, and give the site Alpendre's website export link. |
+| **API** | A custom-built site | `GET /api/public/<key>/availability` and `POST /api/public/<key>/book` (JSON, CORS enabled, no login). |
+
+```html
+<div data-alpendre="pk_your_house_key"></div>
+<script src="https://your-alpendre-domain/embed.js" async></script>
+```
+
+Website requests arrive as **pending** (or confirmed straight away if you turn on auto-confirm in the house settings), with the price worked out from the house's nightly price, cleaning fee and minimum stay.
 
 ## Going live
 
-The guest website must be reachable on the internet so guests can book, and so Airbnb and Booking.com can read your export links. Deploy it to any Node host (Render, Railway, Fly.io, a small VPS) with:
+Airbnb, Booking.com and your website need to reach Alpendre over the internet. Deploy to any Node host (Render, Railway, Fly.io, a small VPS) with:
 
 - a persistent disk for `data/`
 - `ALPENDRE_PASSWORD` set
@@ -60,12 +69,13 @@ The guest website must be reachable on the internet so guests can book, and so A
 ## Project layout
 
 ```
-server.js            API, storage, iCal import/export, auto-sync
+server.js        API, storage, iCal import/export, public website API, auto-sync
 public/
-  brand.css          colours, type and shared components
-  logo.svg           the mark: three porch arches under a tiled roof
-  index.html  site.* guest website
-  admin/             host dashboard
+  index.html     dashboard shell
+  app.js/.css    dashboard (houses home + per-house workspaces)
+  embed.js       booking widget for your website
+  brand.css      colours, type, shared components
+  logo.svg       the mark: three porch arches under a tiled roof
 ```
 
 ## Brand
@@ -74,7 +84,7 @@ public/
 |---|---|---|
 | Ink | `#1f2a24` | text, sidebar |
 | Cream | `#f7f2e9` | backgrounds (limewashed walls) |
-| Terracotta | `#c4622d` | primary actions, direct bookings (roof tiles) |
+| Terracotta | `#c4622d` | primary actions, website bookings (roof tiles) |
 | Olive | `#6b7f4e` | manual stays, success |
 | Sun | `#e8a93b` | highlights |
 
