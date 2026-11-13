@@ -1,2 +1,2 @@
 // Where the Alpendre API (Cloudflare Worker) lives. Empty = same site as this page.
-window.ALPENDRE_API = '';
+window.ALPENDRE_API = 'https://alpendre.houseguests.workers.dev';
