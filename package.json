@@ -11,5 +11,8 @@
   "license": "MIT",
   "devDependencies": {
     "wrangler": "^3.114.17"
+  },
+  "dependencies": {
+    "worker-mailer": "1.2.1"
   }
 }

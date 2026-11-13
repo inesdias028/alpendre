@@ -2,6 +2,7 @@
 // The Worker routes every request to the Durable Object, which keeps the data in
 // memory, persists changes to its storage and runs the calendar syncs.
 import { DurableObject } from 'cloudflare:workers';
+import { mailReady, confirmationEmail, sendMail } from './mail.js';
 
 const CHANNELS = ['airbnb', 'booking', 'website'];
 const SOURCES = ['airbnb', 'booking', 'website', 'manual'];
@@ -294,6 +295,7 @@ export class Alpendre extends DurableObject {
 
   updateHouse(w, b) {
     for (const k of HOUSE_TEXT) if (typeof b[k] === 'string') w[k] = b[k].trim().slice(0, 200);
+    if (typeof b.confirmMessage === 'string') w.confirmMessage = b.confirmMessage.trim().slice(0, 3000);
     if (!w.name) w.name = 'Untitled house';
     if (typeof b.color === 'string' && /^#[0-9a-f]{6}$/i.test(b.color)) w.color = b.color;
     for (const k of HOUSE_NUM) if (b[k] !== undefined && b[k] !== '' && !isNaN(+b[k])) w[k] = Math.max(k === 'minNights' || k === 'maxGuests' ? 1 : 0, +b[k]);
@@ -304,6 +306,25 @@ export class Alpendre extends DurableObject {
       if (u !== w.channels[c].url) w.channels[c] = { url: u, lastSync: null, lastStatus: null };
     }
     delete w.demo; this.touchW(w);
+  }
+
+  // ---------- guest email ----------
+  async emailGuest(r) {
+    const w = this.house(r.workspaceId);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email || '')) return { emailSent: false, emailError: 'This reservation has no guest email.' };
+    if (!mailReady(this.env)) return { emailSent: false, emailError: 'Email is not set up yet.' };
+    try {
+      const m = confirmationEmail(w, r);
+      await sendMail(this.env, { fromName: w.name, to: r.email, toName: r.guestName, ...m });
+      r.confirmationSentAt = new Date().toISOString(); this.touchR(r);
+      this.log(w.id, `Confirmation email sent to ${r.guestName || r.email}`);
+      return { emailSent: true };
+    } catch (e) {
+      const msg = /535|BadCredentials|not accepted/i.test(e.message) ? 'Gmail refused the login: check the Gmail app password.'
+        : /timed? ?out|timeout/i.test(e.message) ? 'Gmail did not answer in time. Try again.' : e.message.split(/\r?\n/)[0].slice(0, 200);
+      this.log(w.id, `Confirmation email to ${r.email} failed: ${msg}`, 'error');
+      return { emailSent: false, emailError: msg };
+    }
   }
 
   // ---------- auth ----------
@@ -415,7 +436,7 @@ export class Alpendre extends DurableObject {
           checkIn: b.checkIn, checkOut: b.checkOut,
           guestName: String(b.guestName).trim().slice(0, 120), email: String(b.email).trim().slice(0, 200),
           phone: String(b.phone || '').slice(0, 40), guests, price: total,
-          notes, code: 'WEB-' + id().slice(0, 6).toUpperCase(),
+          notes, code: 'WEB-' + id().slice(0, 6).toUpperCase(), lang: b.lang === 'pt' ? 'pt' : b.lang === 'en' ? 'en' : undefined,
           createdAt: new Date().toISOString(),
         };
         this.addReservation(r);
@@ -515,7 +536,7 @@ export class Alpendre extends DurableObject {
         .map(r => ({ ...r, conflicts: r.status === 'cancelled' ? [] : this.conflictsFor(r, r.workspaceId).map(o => o.id) }));
       const log = db.log.filter(l => l.workspaceId ? ids.has(l.workspaceId) : this.isOwner());
       const workspaces = houses.map(w => ({ ...w, ownerId: this.ownerOf(w), ownerName: this.personName(this.ownerOf(w)) }));
-      return json({ settings: db.settings, workspaces, reservations, log, today: today(), defaultPassword: false, apiOrigin: url.origin,
+      return json({ settings: db.settings, workspaces, reservations, log, today: today(), defaultPassword: false, apiOrigin: url.origin, mailReady: mailReady(env), mailFrom: env.GMAIL_USER || '',
         me: { ...this.actor, isOwner: this.isOwner() }, users: this.isOwner() ? db.users.map(publicUser) : [] }, 200, cors);
     }
     if (p === '/api/workspaces' && m === 'POST') {
@@ -557,17 +578,26 @@ export class Alpendre extends DurableObject {
       this.addReservation(r); this.log(r.workspaceId, `Added ${LABEL[r.source]} stay for ${r.guestName || 'guest'}`); await this.save();
       return json(r, 201, cors);
     }
-    const rm = p.match(/^\/api\/reservations\/([a-f0-9]+)$/);
+    const rm = p.match(/^\/api\/reservations\/([a-f0-9]+)(\/email)?$/);
     if (rm) {
       const r = db.reservations.find(x => x.id === rm[1]);
       if (!r || !this.visibleHouse(r.workspaceId)) return json({ error: 'Not found' }, 404, cors);
+      if (rm[2] && m === 'POST') {
+        const out = await this.emailGuest(r);
+        await this.save();
+        return json(out.emailSent ? out : { ...out, error: out.emailError }, out.emailSent ? 200 : 400, cors);
+      }
       if (m === 'PUT') {
-        const b = pick(await readBody(req), EDITABLE);
+        const raw = await readBody(req), b = pick(raw, EDITABLE);
+        const wasConfirmed = r.status === 'confirmed';
         if (r.uid) { delete b.checkIn; delete b.checkOut; delete b.source; }
         if (b.source && !SOURCES.includes(b.source)) delete b.source;
         if ((b.checkIn || b.checkOut) && !((b.checkIn || r.checkIn) < (b.checkOut || r.checkOut))) return json({ error: 'Invalid dates' }, 400, cors);
-        Object.assign(r, b); delete r.demo; this.touchR(r); await this.save();
-        return json(r, 200, cors);
+        Object.assign(r, b); delete r.demo; this.touchR(r);
+        let mail = {};
+        if (raw.notifyGuest === true && r.status === 'confirmed' && !wasConfirmed) mail = await this.emailGuest(r);
+        await this.save();
+        return json({ ...r, ...mail }, 200, cors);
       }
       if (m === 'DELETE') {
         db.reservations = db.reservations.filter(x => x.id !== r.id); this.drop('r:' + r.id);

@@ -435,6 +435,11 @@ function houseForm(w, isNew) {
       <label class="field">Currency<select name="currency">${['EUR', 'GBP', 'USD', 'BRL', 'CHF'].map(c => `<option ${w.currency === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
       <label class="switch full"><input type="checkbox" name="autoConfirm" ${w.autoConfirm ? 'checked' : ''}> Confirm website bookings automatically</label>
     </div>${isNew ? '' : '<div style="margin-top:1rem"><button class="btn primary" type="submit">Save changes</button></div>'}</div>
+    ${isNew ? '' : `<div class="card full-span"><h2>Confirmation email</h2>
+      <p class="help" style="margin:0 0 .8rem">When you confirm a booking, the guest gets an email${S.state.mailFrom ? ` from <b>${esc(S.state.mailFrom)}</b>` : ''} in their language (Portuguese or English) with the dates, check-in and check-out times, guests, total and reference.</p>
+      <label class="field">Extra message (optional)<textarea name="confirmMessage" rows="5" maxlength="3000" placeholder="e.g. how to pay the 30% deposit, the address and how to get there, who to call on arrival">${esc(w.confirmMessage || '')}</textarea>
+      <span class="help">Added to every confirmation email for this house, exactly as written.</span></label>
+      <div style="margin-top:1rem"><button class="btn primary" type="submit">Save changes</button></div></div>`}
   </form>`;
 }
 function readHouseForm() {
@@ -470,6 +475,10 @@ function viewSettings() {
     <div class="card"><h2>Calendar sync</h2>
       <label class="field">Check every connected calendar every<select id="syncMinutes">${[5, 15, 30, 60, 180].map(m => `<option value="${m}" ${s.syncMinutes == m ? 'selected' : ''}>${m < 60 ? m + ' minutes' : m / 60 + ' hour' + (m > 60 ? 's' : '')}</option>`).join('')}</select></label>
       <div style="margin-top:1rem"><button class="btn primary" id="saveSettings">Save</button></div></div>
+    <div class="card"><h2>Guest emails</h2>
+      ${S.state.mailReady ? `<div class="ch-status ok">Sending from ${esc(S.state.mailFrom)}</div><p class="help" style="margin:.6rem 0 0">Confirmation emails go out when you confirm a booking. Each house can add its own message in House settings.</p>`
+        : `<div class="ch-status err">Not set up yet</div><p class="help" style="margin:.6rem 0 0">Create a Gmail app password for ${esc(S.state.mailFrom || 'the sending Gmail account')} and save it on the server with <code>npx wrangler secret put GMAIL_APP_PASSWORD</code>.</p>`}
+    </div>
     <div class="card"><h2>Housekeeping</h2>
       ${houses().some(w => w.demo) ? '<p class="help" style="margin:0 0 .8rem">Demo houses are loaded so you can look around. Remove them before adding your own.</p><button class="btn danger" id="clearDemo">Remove demo houses</button>' : '<p class="help" style="margin:0">No demo data left.</p>'}
       ${S.state.defaultPassword ? '<div class="note bad" style="margin-top:1rem">You are using the default password. Start the server with <code>ALPENDRE_PASSWORD=your-password</code> to change it.</div>' : ''}
@@ -596,7 +605,7 @@ function openDrawer(id, opts = {}) {
     : { workspaceId: opts.hid || '', source: 'manual', status: 'confirmed', checkIn: opts.day, checkOut: add(opts.day, 2), guestName: '', email: '', phone: '', guests: 2, price: '', notes: '', code: '', conflicts: [] };
   if (!r) return;
   const w = houseById(r.workspaceId);
-  const synced = !!r.uid, cur = w ? w.currency : 'EUR';
+  const synced = !!r.uid, cur = w ? w.currency : 'EUR', hasEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email || '');
   const conflicts = r.conflicts.map(cid => S.state.reservations.find(x => x.id === cid)).filter(Boolean);
   showDrawer(`
     <header><div><div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap"><span class="chip ${r.source}">${SOURCES[r.source]}</span>${w ? `<span class="chip" style="background:#efe9df;color:${w.color}">${esc(w.name)}</span>` : ''}</div>
@@ -621,6 +630,10 @@ function openDrawer(id, opts = {}) {
         <label class="field">Reference<input name="code" value="${esc(r.code || '')}"></label>
         <label class="field full">Notes<textarea name="notes" rows="4">${esc(r.notes)}</textarea></label>
       </div>
+      ${id && r.status !== 'confirmed' && r.status !== 'blocked' ? `<label class="switch" title="${hasEmail ? '' : 'Add the guest email to send one'}"><input type="checkbox" id="notifyGuest" ${hasEmail && S.state.mailReady ? 'checked' : 'disabled'}> Email ${esc(r.guestName ? r.guestName.split(' ')[0] : 'the guest')} a confirmation when I confirm</label>
+        ${!S.state.mailReady ? '<p class="help" style="margin:-.5rem 0 0">Email sending isn’t set up yet.</p>' : !hasEmail ? '<p class="help" style="margin:-.5rem 0 0">No guest email on this reservation.</p>' : ''}` : ''}
+      ${id && r.status === 'confirmed' && hasEmail ? `<div class="note">${r.confirmationSentAt ? `Confirmation email sent ${new Date(r.confirmationSentAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}.` : 'No confirmation email sent yet.'}
+        <button type="button" class="btn small" id="emailRes" style="margin-left:.4rem" ${S.state.mailReady ? '' : 'disabled title="Email sending isn’t set up yet"'}>${r.confirmationSentAt ? 'Send again' : 'Send confirmation email'}</button></div>` : ''}
     </form>
     <footer>
       ${id && !synced ? '<button class="btn danger left" id="delRes">Delete</button>' : ''}
@@ -630,13 +643,20 @@ function openDrawer(id, opts = {}) {
   const collect = () => { const fd = Object.fromEntries(new FormData($('#resForm'))); fd.guests = fd.guests === '' ? null : +fd.guests; fd.price = fd.price === '' ? null : +fd.price; return fd; };
   const save = async override => {
     try {
-      const body = { ...collect(), ...override };
-      if (id) await api('/api/reservations/' + id, { method: 'PUT', body }); else await api('/api/reservations', { method: 'POST', body });
-      closeDrawer(); toast(id ? 'Saved' : 'Reservation added'); await refresh();
+      const nb = $('#notifyGuest'), body = { ...collect(), ...override, notifyGuest: !!(nb && nb.checked) };
+      const res = id ? await api('/api/reservations/' + id, { method: 'PUT', body }) : await api('/api/reservations', { method: 'POST', body });
+      closeDrawer();
+      toast(res.emailSent ? `Confirmed · email sent to ${res.email}` : res.emailError ? `Saved, but the email failed: ${res.emailError}` : id ? 'Saved' : 'Reservation added');
+      await refresh();
     } catch (e) { toast(e.message); }
   };
   const on = (sel, fn) => { const el = $(sel); if (el) el.onclick = fn; };
   on('#cancelDr', closeDrawer); on('#saveRes', () => save());
+  on('#emailRes', async () => {
+    const b = $('#emailRes'); b.disabled = true; b.textContent = 'Sending…';
+    try { await api(`/api/reservations/${id}/email`, { method: 'POST' }); toast(`Email sent to ${r.email}`); closeDrawer(); await refresh(); }
+    catch (e) { toast(e.message); b.disabled = false; b.textContent = 'Try again'; }
+  });
   on('#confirmRes', () => save({ status: 'confirmed' })); on('#declineRes', () => save({ status: 'cancelled' }));
   on('#delRes', async () => { if (!confirm('Delete this reservation for good?')) return; await api('/api/reservations/' + id, { method: 'DELETE' }); closeDrawer(); toast('Deleted'); await refresh(); });
 }
