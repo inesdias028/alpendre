@@ -2,10 +2,14 @@
   "name": "alpendre",
   "version": "1.0.0",
   "description": "Alpendre — one place for every booking of your holiday house: Airbnb, Booking.com and your own website.",
-  "main": "server.js",
+  "main": "worker/index.js",
   "scripts": {
-    "start": "node server.js"
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:pages": "node scripts/deploy-pages.js"
   },
-  "engines": { "node": ">=18" },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.114.17"
+  }
 }
