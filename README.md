@@ -14,21 +14,34 @@
 | **Your existing website** | Three ways to connect it (below), so nights sold on your site block Airbnb and Booking.com, and the other way round. |
 | **Double-booking alerts** | Overlapping stays in a house are flagged in red everywhere. |
 
-## Run it
+## Live
 
-Requires Node.js 18 or newer. There are no dependencies.
+- **Dashboard:** https://inesdias028.github.io/alpendre/ (GitHub Pages)
+- **API, calendar links and widget:** https://alpendre.houseguests.workers.dev (Cloudflare Worker)
+
+GitHub Pages only hosts static files, so the server part runs on Cloudflare Workers (free plan). A Durable Object stores all houses and reservations, and a scheduled trigger syncs the calendars every 15 minutes (the sync interval in Settings decides how often a sync actually happens).
+
+## Run it locally
+
+Requires Node.js 18 or newer.
 
 ```bash
-npm start
+npm install
+npm run dev
 ```
 
-Open http://localhost:4300/ (default password `alpendre`). Set your own:
+Open http://localhost:8787/ (local password `alpendre`, set in `.dev.vars`). The first run loads three demo houses. Remove them under **Settings → Remove demo houses**.
+
+## Deploy
 
 ```bash
-ALPENDRE_PASSWORD="choose-a-strong-one" PORT=8080 npm start
+npx wrangler login                          # once
+npx wrangler secret put ALPENDRE_PASSWORD   # once, or to change the password
+npm run deploy                              # the Worker (API + scheduled sync)
+npm run deploy:pages                        # the dashboard, published to the gh-pages branch
 ```
 
-The first run loads three demo houses. Remove them under **Settings → Remove demo houses**. Data is stored in `data/db.json`, so back it up.
+`public/config.js` tells the dashboard where the Worker lives. `ALLOWED_ORIGINS` in `wrangler.toml` lists the sites allowed to use the owner API from a browser.
 
 ## Connecting a house
 
@@ -53,24 +66,19 @@ Pick whichever fits how the site is built:
 
 ```html
 <div data-alpendre="pk_your_house_key"></div>
-<script src="https://your-alpendre-domain/embed.js" async></script>
+<script src="https://alpendre.houseguests.workers.dev/embed.js" async></script>
 ```
 
 Website requests arrive as **pending** (or confirmed straight away if you turn on auto-confirm in the house settings), with the price worked out from the house's nightly price, cleaning fee and minimum stay.
 
-## Going live
-
-Airbnb, Booking.com and your website need to reach Alpendre over the internet. Deploy to any Node host (Render, Railway, Fly.io, a small VPS) with:
-
-- a persistent disk for `data/`
-- `ALPENDRE_PASSWORD` set
-- HTTPS (the platforms require it for calendar links)
-
 ## Project layout
 
 ```
-server.js        API, storage, iCal import/export, public website API, auto-sync
-public/
+worker/index.js  Cloudflare Worker + Durable Object: API, storage, iCal import/export, public website API, scheduled sync
+wrangler.toml    Worker configuration
+scripts/         deploy-pages.js publishes public/ to GitHub Pages
+public/          dashboard (GitHub Pages)
+  config.js      where the API lives
   index.html     dashboard shell
   app.js/.css    dashboard (houses home + per-house workspaces)
   embed.js       booking widget for your website
