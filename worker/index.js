@@ -402,13 +402,20 @@ export class Alpendre extends DurableObject {
         const guests = Number(b.guests);
         if (!(guests >= 1 && guests <= w.maxGuests)) errors.push(`Guests must be between 1 and ${w.maxGuests}.`);
         if (errors.length) return json({ errors }, 400, PUBLIC_CORS);
-        const n = nights(b.checkIn, b.checkOut), total = n * w.nightlyPrice + w.cleaningFee;
+        const n = nights(b.checkIn, b.checkOut);
+        // A website with its own pricing (e.g. by season) sends the total the guest saw; it is a
+        // request the host confirms, so it is stored as quoted and marked as such in the notes.
+        const quoted = Number(b.total), useQuote = Number.isFinite(quoted) && quoted > 0 && quoted < 1e6;
+        const total = useQuote ? Math.round(quoted * 100) / 100 : n * w.nightlyPrice + w.cleaningFee;
+        const extra = b.details && typeof b.details === 'object' ? Object.entries(b.details).slice(0, 12)
+          .map(([k, v]) => `${String(k).slice(0, 40)}: ${String(v).slice(0, 200)}`).join('\n') : '';
+        const notes = [String(b.message || '').slice(0, 2000), extra, useQuote ? 'Price as quoted on the website.' : ''].filter(Boolean).join('\n\n');
         const r = {
           id: id(), workspaceId: w.id, source: 'website', status: w.autoConfirm ? 'confirmed' : 'pending',
           checkIn: b.checkIn, checkOut: b.checkOut,
           guestName: String(b.guestName).trim().slice(0, 120), email: String(b.email).trim().slice(0, 200),
           phone: String(b.phone || '').slice(0, 40), guests, price: total,
-          notes: String(b.message || '').slice(0, 2000), code: 'WEB-' + id().slice(0, 6).toUpperCase(),
+          notes, code: 'WEB-' + id().slice(0, 6).toUpperCase(),
           createdAt: new Date().toISOString(),
         };
         this.addReservation(r);
