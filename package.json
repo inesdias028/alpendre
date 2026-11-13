@@ -1,0 +1,11 @@
+{
+  "name": "alpendre",
+  "version": "1.0.0",
+  "description": "Alpendre — one place for every booking of your holiday house: Airbnb, Booking.com and your own website.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=18" },
+  "license": "MIT"
+}
