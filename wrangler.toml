@@ -25,4 +25,4 @@ crons = ["*/5 * * * *"]
 # Sites allowed to call the owner API from the browser (the GitHub Pages dashboard).
 ALLOWED_ORIGINS = "https://inesdias028.github.io"
 # Guest emails are sent from this Gmail account (its app password is the GMAIL_APP_PASSWORD secret).
-GMAIL_USER = "cabecoentertainment@gmail.com"
+GMAIL_USER = "cabecoreservations@gmail.com"
