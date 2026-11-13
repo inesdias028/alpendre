@@ -24,9 +24,17 @@ const monthStart = s => s.slice(0, 8) + '01';
 const nextMonth = s => { const d = D(monthStart(s)); d.setUTCMonth(d.getUTCMonth() + 1); return F(d); };
 
 // ---------- api ----------
+// config.js sets window.ALPENDRE_API when the dashboard is hosted apart from the API (GitHub Pages).
+const API = String(window.ALPENDRE_API || '').replace(/\/$/, '');
+const API_ORIGIN = API || location.origin;
+let TOKEN = ''; try { TOKEN = localStorage.getItem('alp_token') || ''; } catch { /* storage blocked */ }
+function setToken(t) { TOKEN = t; try { t ? localStorage.setItem('alp_token', t) : localStorage.removeItem('alp_token'); } catch { /* ignore */ } }
 async function api(path, opts = {}) {
-  const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
-  if (res.status === 401 && path !== '/api/login') { showLogin(); throw new Error('Signed out'); }
+  let res;
+  try {
+    res = await fetch(API + path, { ...opts, headers: { 'Content-Type': 'application/json', ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) }, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  } catch { throw new Error('Cannot reach the Alpendre server'); }
+  if (res.status === 401 && path !== '/api/login') { setToken(''); showLogin(); throw new Error('Signed out'); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || (data.errors || []).join(' ') || 'Request failed');
   return data;
@@ -37,10 +45,10 @@ async function refresh() { S.state = await api('/api/state'); render(); }
 function showLogin() { $('#app').hidden = true; $('#login').hidden = false; }
 $('#loginForm').addEventListener('submit', async e => {
   e.preventDefault();
-  try { await api('/api/login', { method: 'POST', body: { password: e.target.password.value } }); $('#login').hidden = true; $('#app').hidden = false; await refresh(); }
+  try { const d = await api('/api/login', { method: 'POST', body: { password: e.target.password.value } }); setToken(d.token); $('#login').hidden = true; $('#app').hidden = false; await refresh(); }
   catch (err) { $('#loginErr').textContent = err.message; }
 });
-$('#logout').addEventListener('click', async () => { await api('/api/logout', { method: 'POST' }); showLogin(); });
+$('#logout').addEventListener('click', async () => { try { await api('/api/logout', { method: 'POST' }); } catch { /* already signed out */ } setToken(''); showLogin(); });
 
 // ---------- data helpers ----------
 const houses = () => S.state.workspaces;
@@ -120,7 +128,7 @@ function renderSide() {
 function viewHome() {
   const t = S.state.today, t30 = add(t, 30), t7 = add(t, 7);
   const list = houses();
-  if (!list.length) return `<div class="card" style="text-align:center;padding:3rem 1rem"><img src="/logo.svg" width="56" height="56" alt=""><h2 style="margin:1rem 0 .5rem">Add your first house</h2>
+  if (!list.length) return `<div class="card" style="text-align:center;padding:3rem 1rem"><img src="logo.svg" width="56" height="56" alt=""><h2 style="margin:1rem 0 .5rem">Add your first house</h2>
     <p class="sub" style="margin-bottom:1.2rem">Each house is a workspace with its own Airbnb, Booking.com and website connections.</p><button class="btn primary" data-act="add-house">+ Add a house</button></div>`;
   const occ = Math.round(list.reduce((n, w) => n + bookedNights(w.id, t, t30), 0) / (list.length * 30) * 100);
   const arrivals = stays().filter(r => r.checkIn >= t && r.checkIn < t7).length;
@@ -318,7 +326,7 @@ const HOUSE = {
   },
 
   channels(w) {
-    const base = `${location.origin}/ical/${w.exportToken}`;
+    const base = `${API_ORIGIN}/ical/${w.exportToken}`;
     const status = c => { const ch = w.channels[c], st = ch.lastStatus || '';
       return `<div class="ch-status ${st.startsWith('ok') ? 'ok' : st.startsWith('error') ? 'err' : ''}">${ch.url ? `Last sync ${ago(ch.lastSync)}${st ? ' · ' + esc(st) : ''}` : 'Not connected yet'}</div>`; };
     const copy = v => `<div class="copy"><input readonly value="${esc(v)}"><button class="btn small" data-copy="${esc(v)}">Copy</button></div>`;
@@ -331,7 +339,7 @@ const HOUSE = {
         <p class="help">Blocks the nights booked everywhere else, so ${SOURCES[key]} never sells them twice.</p></div>
       <details><summary>How do I add it to ${SOURCES[key]}?</summary><ol>${exp}</ol></details></div>`;
 
-    const snippet = `<div data-alpendre="${w.publicKey}"></div>\n<script src="${location.origin}/embed.js" async></script>`;
+    const snippet = `<div data-alpendre="${w.publicKey}"></div>\n<script src="${API_ORIGIN}/embed.js" async></script>`;
     const tabs = { widget: 'Booking widget', ical: 'Calendar sync', api: 'API' };
     const webBody = {
       widget: `<p class="help" style="margin:0">Paste this where the booking section should appear on your site (WordPress: a <b>Custom HTML</b> block; Wix/Squarespace: an <b>Embed code</b> block). It shows live availability and takes booking requests straight into Alpendre.</p>
@@ -343,8 +351,8 @@ const HOUSE = {
         ${w.channels.website.url ? status('website') : ''}
         <div class="field">2 · Export: give this link to your website's booking system${copy(`${base}/website.ics`)}<p class="help">Blocks the nights sold on Airbnb and Booking.com.</p></div>`,
       api: `<p class="help" style="margin:0">For a custom-built site. Your developer can call these directly. They're open to the browser (CORS) and need no login.</p>
-        <div class="field">Availability (GET)${copy(`${location.origin}/api/public/${w.publicKey}/availability`)}</div>
-        <div class="field">Create booking (POST JSON)${copy(`${location.origin}/api/public/${w.publicKey}/book`)}
+        <div class="field">Availability (GET)${copy(`${API_ORIGIN}/api/public/${w.publicKey}/availability`)}</div>
+        <div class="field">Create booking (POST JSON)${copy(`${API_ORIGIN}/api/public/${w.publicKey}/book`)}
           <p class="help">Body: <code>{ checkIn, checkOut, guestName, email, phone, guests, message }</code>, with dates as YYYY-MM-DD.</p></div>`,
     };
     return `<div class="grid channels">
@@ -564,4 +572,5 @@ function openDrawer(id, opts = {}) {
 
 // ---------- boot ----------
 S.route = parseRoute();
-api('/api/state').then(st => { S.state = st; $('#app').hidden = false; render(); }).catch(() => {});
+if (!TOKEN) showLogin();
+else api('/api/state').then(st => { S.state = st; $('#app').hidden = false; render(); }).catch(e => { if (e.message !== 'Signed out') { showLogin(); $('#loginErr').textContent = e.message; } });

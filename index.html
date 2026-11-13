@@ -4,15 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Alpendre</title>
-<link rel="icon" href="/logo.svg">
-<link rel="stylesheet" href="/brand.css">
-<link rel="stylesheet" href="/app.css">
+<link rel="icon" href="logo.svg">
+<link rel="stylesheet" href="brand.css">
+<link rel="stylesheet" href="app.css">
 </head>
 <body>
 
 <section id="login" class="login" hidden>
   <form class="login-card" id="loginForm">
-    <img src="/logo.svg" alt="" width="56" height="56">
+    <img src="logo.svg" alt="" width="56" height="56">
     <h1>Alpendre</h1>
     <p>Every booking, one porch.</p>
     <label class="field">Password<input type="password" name="password" autocomplete="current-password" autofocus required></label>
@@ -23,7 +23,7 @@
 
 <div id="app" class="shell" hidden>
   <aside class="side">
-    <a class="brand" href="#/"><img src="/logo.svg" alt="" width="34" height="34"><span>Alpendre</span></a>
+    <a class="brand" href="#/"><img src="logo.svg" alt="" width="34" height="34"><span>Alpendre</span></a>
     <nav>
       <a href="#/" data-nav="home"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>All houses<span class="badge" id="pendingBadge" hidden></span></a>
     </nav>
@@ -58,6 +58,7 @@
 <aside class="drawer" id="drawer" aria-hidden="true"></aside>
 <div class="toast" id="toast"></div>
 
-<script src="/app.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
