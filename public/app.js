@@ -81,6 +81,8 @@ async function showInvite(tokenId) {
 
 // ---------- data helpers ----------
 const houses = () => S.state.workspaces;
+const isOwner = () => !!(S.state && S.state.me && S.state.me.isOwner);
+const othersExist = () => isOwner() && (S.state.users || []).length > 0;
 const houseById = id => houses().find(w => w.id === id);
 const resOf = hid => S.state.reservations.filter(r => !hid || r.workspaceId === hid);
 const live = hid => resOf(hid).filter(r => r.status !== 'cancelled');
@@ -160,7 +162,7 @@ function viewHome() {
   const t = S.state.today, t30 = add(t, 30), t7 = add(t, 7);
   const list = houses();
   if (!list.length) return `<div class="card" style="text-align:center;padding:3rem 1rem"><img src="logo.svg" width="56" height="56" alt=""><h2 style="margin:1rem 0 .5rem">Add your first house</h2>
-    <p class="sub" style="margin-bottom:1.2rem">Each house is a workspace with its own Airbnb, Booking.com and website connections.</p><button class="btn primary" data-act="add-house">+ Add a house</button></div>`;
+    <p class="sub" style="margin-bottom:1.2rem">Each house is a workspace with its own Airbnb, Booking.com and website connections.${isOwner() ? '' : ' Only you (and the owner) will see your houses.'}</p><button class="btn primary" data-act="add-house">+ Add a house</button></div>`;
   const occ = Math.round(list.reduce((n, w) => n + bookedNights(w.id, t, t30), 0) / (list.length * 30) * 100);
   const arrivals = stays().filter(r => r.checkIn >= t && r.checkIn < t7).length;
   const pending = live().filter(r => r.status === 'pending');
@@ -173,7 +175,7 @@ function viewHome() {
     const next = stays(w.id).filter(r => r.checkIn > t).sort((a, b) => a.checkIn.localeCompare(b.checkIn))[0];
     const pend = live(w.id).filter(r => r.status === 'pending').length;
     return `<div class="hcard" data-go="#/h/${w.id}/overview"><div class="strip" style="background:${w.color}"></div><div class="in">
-      <div><h3>${esc(w.name)}</h3><div class="loc">${esc(w.location || 'No location set')}</div></div>
+      <div><h3>${esc(w.name)}</h3><div class="loc">${esc(w.location || 'No location set')}${othersExist() ? ` · <span class="owner-tag">${esc(w.ownerName)}</span>` : ''}</div></div>
       <div class="conn">${CHANNELS.map(c => `<span class="${channelState(w, c)}" title="${SOURCES[c]}: ${channelState(w, c) === 'on' ? 'connected' : channelState(w, c) === 'err' ? 'sync error' : 'not connected'}">${SOURCES[c]}</span>`).join('')}</div>
       <div class="stats"><div><b>${o}%</b><span>booked in ${MONTHS[D(t).getUTCMonth()]}</span></div><div><b>${inHouse ? 'Occupied' : 'Free'}</b><span>tonight</span></div></div>
       <div class="next">${next ? `Next: <b>${esc(guestLabel(next))}</b> · ${short(next.checkIn)}` : 'No upcoming arrivals'}</div>
@@ -224,7 +226,7 @@ function timeline() {
       bars += `<div class="bar ${barClass(r, r.checkIn < start, r.checkOut > end)}" data-open="${r.id}" title="${esc(guestLabel(r))} · ${SOURCES[r.source]} · ${range(r)}" style="grid-column:${s + 1}/${e + 1};grid-row:${lane + 1}">${esc(guestLabel(r))}</div>`;
     }
     const line = todayIdx >= 0 && todayIdx < N ? `<div class="today-line" style="left:calc(${todayIdx} * 100% / ${N})"></div>` : '';
-    return `<div class="hcell" data-go="#/h/${w.id}/calendar"><span class="dot" style="background:${w.color}"></span>${esc(w.name)}</div><div class="row">${line}${bars}</div>`;
+    return `<div class="hcell" data-go="#/h/${w.id}/calendar" title="${othersExist() ? 'Belongs to ' + esc(w.ownerName) : ''}"><span class="dot" style="background:${w.color}"></span>${esc(w.name)}</div><div class="row">${line}${bars}</div>`;
   }).join('');
   return `<div class="tl-head"><h2>Timeline <small style="font-family:var(--sans);font-size:.8rem;color:var(--muted);font-weight:500">all houses</small></h2>
       <div class="legend" style="margin:0 .5rem 0 0">${Object.keys(SOURCES).map(s => `<span class="chip ${s}">${SOURCES[s]}</span>`).join('')}</div>
@@ -258,7 +260,7 @@ function alerts(hid) {
     const noName = stays(w.id).filter(r => r.checkOut >= t && !r.guestName).length;
     if (noName && hid) out.push(`<div class="alert info" data-go="#/h/${w.id}/reservations"><span><b>${noName} synced stays</b> have no guest name. Airbnb and Booking.com calendars only share dates, so add guest details yourself.</span></div>`);
   }
-  if (!hid && S.state.workspaces.some(w => w.demo)) out.push(`<div class="alert info" data-go="#/settings"><span>These are <b>demo houses</b>. Remove them in Settings when you're ready.</span></div>`);
+  if (!hid && isOwner() && S.state.workspaces.some(w => w.demo)) out.push(`<div class="alert info" data-go="#/settings"><span>These are <b>demo houses</b>. Remove them in Settings when you're ready.</span></div>`);
   return out.join('');
 }
 
@@ -420,6 +422,10 @@ function houseForm(w, isNew) {
     <div class="${isNew ? '' : 'card'}">${isNew ? '' : '<h2>The house</h2>'}<div class="form-grid">
       <div class="full">${f('name', 'Name', 'text', 'required maxlength="80" placeholder="e.g. Casa da Praia"')}</div>
       <div class="full">${f('location', 'Location', 'text', 'placeholder="e.g. Lagos, Algarve"')}</div>
+      ${!isNew && othersExist() ? `<label class="field full">Belongs to<select name="ownerId">
+        <option value="owner" ${w.ownerId === 'owner' ? 'selected' : ''}>Owner (you)</option>
+        ${S.state.users.map(u => `<option value="${u.id}" ${w.ownerId === u.id ? 'selected' : ''}>${esc(u.name)}${u.status === 'active' ? '' : ' (invite not accepted yet)'}</option>`).join('')}
+      </select><span class="help">Only this person (and the owner) can see the house and its reservations.</span></label>` : ''}
       <div class="field full">Colour<div class="swatches">${COLORS.map(c => `<label style="background:${c}"><input type="radio" name="color" value="${c}" ${w.color === c ? 'checked' : ''}></label>`).join('')}</div></div>
       ${f('checkInTime', 'Check-in from', 'time')}${f('checkOutTime', 'Check-out by', 'time')}
     </div></div>
@@ -444,19 +450,22 @@ function peopleCard() {
     <div style="flex:1;min-width:0"><div style="font-weight:600">${esc(name)}</div><div class="help" style="margin:0">${sub}</div></div>
     ${status}${actions}</li>`;
   const badge = (t, cls) => `<span class="tag ${cls}">${t}</span>`;
-  return `<div class="card" style="margin-top:1rem"><h2>People <small>everyone here has full access</small></h2>
+  return `<div class="card"><h2>People <small>each person sees only their own houses</small></h2>
     <ul style="list-style:none;margin:0;padding:0">
-      ${row('Owner', 'Signs in with the owner password (leave the username empty)', badge('owner', 'in'), '')}
+      ${row('Owner', 'Sees every house · signs in with the owner password (leave the username empty)', badge('owner', 'in'), '')}
       ${users.map(u => row(u.name, `username <b>${esc(u.login)}</b>${u.email ? ' · ' + esc(u.email) : ''}${u.createdBy ? ' · added by ' + esc(u.createdBy) : ''}`,
         u.status === 'active' ? badge('active', 'in') : badge(u.status === 'invited' ? 'invite sent' : 'invite expired', 'out'),
         u.id === me.id ? '<span class="help" style="margin:0">you</span>' : `<button class="btn small" data-reinvite="${u.id}" title="Make a new invite link (also resets a forgotten password)">${u.status === 'active' ? 'Reset password' : 'New link'}</button><button class="btn small danger" data-remove-user="${u.id}">Remove</button>`)).join('')}
     </ul>
     <div style="display:flex;gap:.5rem;margin-top:1rem;flex-wrap:wrap"><button class="btn primary" id="inviteBtn">+ Invite a person</button>
-    ${me.id && me.id !== 'owner' ? '<button class="btn" id="changePw">Change my password</button>' : ''}</div></div>`;
+    </div></div>`;
 }
 
 function viewSettings() {
   const s = S.state.settings;
+  if (!isOwner()) return `<div class="card" style="max-width:560px"><h2>My account</h2>
+    <p class="help" style="margin:0 0 1rem">Signed in as <b>${esc(S.state.me.name)}</b>. You see the houses that belong to you. Ask the owner to add or move houses, or to invite people.</p>
+    <button class="btn" id="changePw">Change my password</button></div>`;
   return peopleCard() + `<div class="grid two">
     <div class="card"><h2>Calendar sync</h2>
       <label class="field">Check every connected calendar every<select id="syncMinutes">${[15, 30, 60, 180].map(m => `<option value="${m}" ${s.syncMinutes == m ? 'selected' : ''}>${m < 60 ? m + ' minutes' : m / 60 + ' hour' + (m > 60 ? 's' : '')}</option>`).join('')}</select></label>
@@ -518,8 +527,9 @@ const AFTER = {
       };
       return;
     }
-    $('#inviteBtn').onclick = openInviteDrawer;
     const cp = $('#changePw'); if (cp) cp.onclick = openPasswordDrawer;
+    if (!isOwner()) return;
+    $('#inviteBtn').onclick = openInviteDrawer;
     $$('[data-reinvite]').forEach(b => b.onclick = async () => {
       const u = S.state.users.find(x => x.id === b.dataset.reinvite);
       if (u.status === 'active' && !confirm(`Reset ${u.name}'s password? They are signed out and need the new link to choose a password again.`)) return;
@@ -634,7 +644,7 @@ function openDrawer(id, opts = {}) {
 // ---------- people drawers ----------
 const inviteUrl = t => `${location.origin}${location.pathname}#/invite/${t}`;
 function openInviteDrawer() {
-  showDrawer(`<header><div><h2>Invite a person</h2><p class="sub">They get full access to every house.</p></div><button class="x" id="closeDr" aria-label="Close">×</button></header>
+  showDrawer(`<header><div><h2>Invite a person</h2><p class="sub">They'll see only the houses that belong to them: the ones they add, or that you move to them.</p></div><button class="x" id="closeDr" aria-label="Close">×</button></header>
     <form class="body" id="inviteForm">
       <label class="field">Full name<input name="name" required maxlength="80" autocomplete="off"></label>
       <label class="field">Username<input name="login" maxlength="40" autocapitalize="none" spellcheck="false" placeholder="first name, if left empty"><span class="help">What they type to sign in.</span></label>

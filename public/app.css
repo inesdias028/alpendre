@@ -271,3 +271,4 @@ details ol { padding-left: 1.2rem; margin: .5rem 0 0; line-height: 1.55; }
 .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--terracotta-soft); color: var(--terracotta-dark); display: grid; place-items: center; font-weight: 700; font-size: .8rem; flex: none; }
 .side-foot .me { font-size: .78rem; color: #a9a497; text-align: center; padding-bottom: .2rem; }
 .login-card .help { text-align: left; }
+.owner-tag { display: inline-block; font-size: .72rem; font-weight: 600; padding: .05rem .45rem; border-radius: 6px; background: #efe9df; color: var(--ink-2); }

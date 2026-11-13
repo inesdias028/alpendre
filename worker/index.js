@@ -120,6 +120,7 @@ export class Alpendre extends DurableObject {
     this.env = env;
     this.dirty = new Set();   // storage keys to write
     this.gone = new Set();    // storage keys to delete
+    this.lock = { syncing: null };
     ctx.blockConcurrencyWhile(() => this.load());
   }
 
@@ -135,8 +136,16 @@ export class Alpendre extends DurableObject {
       else if (k.startsWith('u:')) this.db.users.push(v);
     }
     this.db.users.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    // Houses from before ownership existed: give each to whoever the log says created it.
+    for (const w of this.db.workspaces) {
+      if (w.ownerId) continue;
+      const made = this.db.log.find(l => l.workspaceId === w.id && /^House “/.test(l.msg) && l.by);
+      const u = made && this.db.users.find(x => x.name === made.by);
+      w.ownerId = u ? u.id : 'owner'; this.touch('w:' + w.id);
+    }
     this.db.workspaces.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    if (!all.has('settings')) { this.seed(); this.touch('settings'); await this.save(); }
+    if (!all.has('settings')) { this.seed(); this.touch('settings'); }
+    if (this.dirty.size) await this.save();
   }
   touch(key) { this.dirty.add(key); this.gone.delete(key); }
   touchW(w) { this.touch('w:' + w.id); }
@@ -164,7 +173,13 @@ export class Alpendre extends DurableObject {
     this.db.log.unshift({ at: new Date().toISOString(), workspaceId, level, msg, by: this.actor ? this.actor.name : null });
     this.db.log = this.db.log.slice(0, 300); this.touch('log');
   }
+  // Houses belong to whoever created them; the owner account sees and manages all of them.
+  isOwner() { return !!this.actor && this.actor.id === 'owner'; }
+  ownerOf(w) { return w.ownerId || 'owner'; }
+  canSee(w) { return !!w && !!this.actor && (this.isOwner() || this.ownerOf(w) === this.actor.id); }
   house(wid) { return this.db.workspaces.find(w => w.id === wid); }
+  visibleHouse(wid) { const w = this.house(wid); return this.canSee(w) ? w : null; }
+  personName(uid) { return uid === 'owner' ? 'Owner' : (this.db.users.find(u => u.id === uid) || {}).name || 'Removed person'; }
   activeIn(wid) { return this.db.reservations.filter(r => r.workspaceId === wid && r.status !== 'cancelled'); }
   conflictsFor(r, wid) { return this.activeIn(wid).filter(o => o.id !== r.id && overlaps(o, r)); }
   addReservation(r) { this.db.reservations.push(r); this.touchR(r); }
@@ -172,7 +187,7 @@ export class Alpendre extends DurableObject {
   seed() {
     const t = today();
     const houses = [
-      newHouse({ name: 'Casa da Colina', location: 'Algarve', demo: true, nightlyPrice: 180, cleaningFee: 60, minNights: 3, maxGuests: 8 }, 0),
+      newHouse({ ownerId: 'owner', name: 'Casa da Colina', location: 'Algarve', demo: true, nightlyPrice: 180, cleaningFee: 60, minNights: 3, maxGuests: 8 }, 0),
       newHouse({ name: 'Apartamento Ribeira', location: 'Porto', demo: true, nightlyPrice: 110, cleaningFee: 40, minNights: 2, maxGuests: 4 }, 2),
       newHouse({ name: 'Monte das Oliveiras', location: 'Alentejo', demo: true, nightlyPrice: 220, cleaningFee: 80, minNights: 3, maxGuests: 10 }, 1),
     ];
@@ -251,14 +266,14 @@ export class Alpendre extends DurableObject {
   }
   async syncHouses(list) {
     // Durable Object input gates already serialise requests; the flag guards against overlap across awaits.
-    while (this.syncing) await this.syncing;
-    let done; this.syncing = new Promise(r => (done = r));
+    while (this.lock.syncing) await this.lock.syncing;
+    let done; this.lock.syncing = new Promise(r => (done = r));
     try {
       const results = [];
       for (const w of list) for (const c of CHANNELS) results.push(await this.syncChannel(w, c));
       await this.save();
       return results;
-    } finally { this.syncing = null; done(); }
+    } finally { this.lock.syncing = null; done(); }
   }
 
   exportFor(w, target) {
@@ -336,9 +351,13 @@ export class Alpendre extends DurableObject {
       const last = this.db.settings.lastAutoSync ? Date.parse(this.db.settings.lastAutoSync) : 0;
       if (Date.now() - last < (mins - 1) * 60e3) return json({ skipped: true });
       this.db.settings.lastAutoSync = new Date().toISOString(); this.touch('settings');
-      return json({ results: await this.syncHouses(this.db.workspaces) });
+      const run = Object.create(this); run.actor = null; // automatic run: nobody to credit in the log
+      return json({ results: await run.syncHouses(this.db.workspaces) });
     }
-    try { return await this.route(req, url, p, m); }
+    // Requests can interleave while one awaits the network, so each gets its own view that
+    // carries who is signed in. Data (db, dirty sets, sync lock) stays shared via the prototype.
+    const view = Object.create(this); view.actor = null;
+    try { return await view.route(req, url, p, m); }
     catch (e) { return json({ error: e.message }, 500, ownerCors(req, this.env)); }
   }
 
@@ -433,8 +452,10 @@ export class Alpendre extends DurableObject {
     if (!this.actor) return json({ error: 'Not signed in' }, 401, cors);
 
     // people (everyone has full access, including managing people)
-    if (p === '/api/users' && m === 'GET') return json({ me: this.actor, users: this.db.users.map(publicUser) }, 200, cors);
+    const ownerOnly = () => json({ error: 'Only the owner account can do this.' }, 403, cors);
+    if (p === '/api/users' && m === 'GET') return json({ me: this.actor, users: this.isOwner() ? this.db.users.map(publicUser) : [] }, 200, cors);
     if (p === '/api/users' && m === 'POST') {
+      if (!this.isOwner()) return ownerOnly();
       const b = await readBody(req);
       const name = String(b.name || '').trim().slice(0, 80);
       if (name.length < 2) return json({ error: 'Enter a name.' }, 400, cors);
@@ -451,6 +472,7 @@ export class Alpendre extends DurableObject {
     }
     const um = p.match(/^\/api\/users\/([a-f0-9]+)(\/invite)?$/);
     if (um) {
+      if (!this.isOwner()) return ownerOnly();
       const u = this.db.users.find(x => x.id === um[1]);
       if (!u) return json({ error: 'Person not found' }, 404, cors);
       if (um[2] && m === 'POST') { // a fresh invite link is also how a forgotten password is reset
@@ -462,6 +484,7 @@ export class Alpendre extends DurableObject {
       if (!um[2] && m === 'DELETE') {
         if (u.id === this.actor.id) return json({ error: 'You cannot remove yourself.' }, 400, cors);
         this.db.users = this.db.users.filter(x => x.id !== u.id); this.drop('u:' + u.id);
+        for (const w of this.db.workspaces.filter(w => w.ownerId === u.id)) { w.ownerId = 'owner'; this.touchW(w); }
         await this.endSessionsOf(u.id); this.log(null, `Removed ${u.name}`); await this.save();
         return json({ ok: true }, 200, cors);
       }
@@ -477,23 +500,35 @@ export class Alpendre extends DurableObject {
 
     const db = this.db;
     if (p === '/api/state' && m === 'GET') {
-      const reservations = db.reservations.map(r => ({ ...r, conflicts: r.status === 'cancelled' ? [] : this.conflictsFor(r, r.workspaceId).map(o => o.id) }));
-      return json({ settings: db.settings, workspaces: db.workspaces, reservations, log: db.log, today: today(), defaultPassword: false, apiOrigin: url.origin, me: this.actor, users: db.users.map(publicUser) }, 200, cors);
+      const houses = db.workspaces.filter(w => this.canSee(w));
+      const ids = new Set(houses.map(w => w.id));
+      const reservations = db.reservations.filter(r => ids.has(r.workspaceId))
+        .map(r => ({ ...r, conflicts: r.status === 'cancelled' ? [] : this.conflictsFor(r, r.workspaceId).map(o => o.id) }));
+      const log = db.log.filter(l => l.workspaceId ? ids.has(l.workspaceId) : this.isOwner());
+      const workspaces = houses.map(w => ({ ...w, ownerId: this.ownerOf(w), ownerName: this.personName(this.ownerOf(w)) }));
+      return json({ settings: db.settings, workspaces, reservations, log, today: today(), defaultPassword: false, apiOrigin: url.origin,
+        me: { ...this.actor, isOwner: this.isOwner() }, users: this.isOwner() ? db.users.map(publicUser) : [] }, 200, cors);
     }
     if (p === '/api/workspaces' && m === 'POST') {
-      const b = await readBody(req), w = newHouse({}, db.workspaces.length);
+      const b = await readBody(req), w = newHouse({ ownerId: this.actor.id }, db.workspaces.length);
       try { this.updateHouse(w, b); } catch (e) { return json({ error: e.message }, 400, cors); }
       db.workspaces.push(w); this.touchW(w); this.log(w.id, `House “${w.name}” created`); await this.save();
       return json(w, 201, cors);
     }
     const wm = p.match(/^\/api\/workspaces\/([a-f0-9]+)(\/sync|\/rotate)?$/);
     if (wm) {
-      const w = this.house(wm[1]);
+      const w = this.visibleHouse(wm[1]);
       if (!w) return json({ error: 'House not found' }, 404, cors);
       if (wm[2] === '/sync' && m === 'POST') return json({ results: await this.syncHouses([w]) }, 200, cors);
       if (wm[2] === '/rotate' && m === 'POST') { w.exportToken = token(); this.touchW(w); this.log(w.id, 'Calendar export links replaced'); await this.save(); return json(w, 200, cors); }
       if (!wm[2] && m === 'PUT') {
-        try { this.updateHouse(w, await readBody(req)); } catch (e) { return json({ error: e.message }, 400, cors); }
+        const b = await readBody(req);
+        if (b.ownerId !== undefined && b.ownerId !== this.ownerOf(w)) {
+          if (!this.isOwner()) return ownerOnly();
+          if (b.ownerId !== 'owner' && !db.users.some(u => u.id === b.ownerId)) return json({ error: 'Unknown person' }, 400, cors);
+          w.ownerId = b.ownerId; this.log(w.id, `House moved to ${this.personName(b.ownerId)}`);
+        }
+        try { this.updateHouse(w, b); } catch (e) { return json({ error: e.message }, 400, cors); }
         await this.save(); return json(w, 200, cors);
       }
       if (!wm[2] && m === 'DELETE') {
@@ -506,7 +541,7 @@ export class Alpendre extends DurableObject {
     }
     if (p === '/api/reservations' && m === 'POST') {
       const b = await readBody(req);
-      if (!this.house(b.workspaceId)) return json({ error: 'Choose a house' }, 400, cors);
+      if (!this.visibleHouse(b.workspaceId)) return json({ error: 'Choose a house' }, 400, cors);
       if (!isDate(b.checkIn) || !isDate(b.checkOut) || b.checkOut <= b.checkIn) return json({ error: 'Invalid dates' }, 400, cors);
       const r = { id: id(), workspaceId: b.workspaceId, source: 'manual', status: 'confirmed', guestName: '', email: '', phone: '', guests: null, price: null, notes: '', code: '', createdAt: new Date().toISOString(), ...pick(b, EDITABLE) };
       if (!SOURCES.includes(r.source)) r.source = 'manual';
@@ -516,7 +551,7 @@ export class Alpendre extends DurableObject {
     const rm = p.match(/^\/api\/reservations\/([a-f0-9]+)$/);
     if (rm) {
       const r = db.reservations.find(x => x.id === rm[1]);
-      if (!r) return json({ error: 'Not found' }, 404, cors);
+      if (!r || !this.visibleHouse(r.workspaceId)) return json({ error: 'Not found' }, 404, cors);
       if (m === 'PUT') {
         const b = pick(await readBody(req), EDITABLE);
         if (r.uid) { delete b.checkIn; delete b.checkOut; delete b.source; }
@@ -531,13 +566,15 @@ export class Alpendre extends DurableObject {
         return json({ ok: true }, 200, cors);
       }
     }
-    if (p === '/api/sync' && m === 'POST') return json({ results: await this.syncHouses(db.workspaces) }, 200, cors);
+    if (p === '/api/sync' && m === 'POST') return json({ results: await this.syncHouses(db.workspaces.filter(w => this.canSee(w))) }, 200, cors);
     if (p === '/api/settings' && m === 'PUT') {
+      if (!this.isOwner()) return ownerOnly();
       const b = await readBody(req);
       if ([15, 30, 60, 180].includes(+b.syncMinutes)) { db.settings.syncMinutes = +b.syncMinutes; this.touch('settings'); }
       await this.save(); return json(db.settings, 200, cors);
     }
     if (p === '/api/demo' && m === 'DELETE') {
+      if (!this.isOwner()) return ownerOnly();
       const demo = new Set(db.workspaces.filter(w => w.demo).map(w => w.id));
       for (const w of db.workspaces.filter(w => w.demo)) this.drop('w:' + w.id);
       for (const r of db.reservations.filter(r => r.demo || demo.has(r.workspaceId))) this.drop('r:' + r.id);
