@@ -1,0 +1,65 @@
+/* Alpendre — brand tokens
+   "Alpendre" is Portuguese for porch: the place where every guest arrives,
+   whatever road they came by (Airbnb, Booking.com or your own website). */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --ink: #1f2a24;          /* deep olive ink */
+  --ink-2: #4a564f;
+  --muted: #7d867f;
+  --line: #e6dfd2;
+  --cream: #f7f2e9;        /* limewashed wall */
+  --paper: #fffdf9;
+  --terracotta: #c4622d;   /* roof tile */
+  --terracotta-dark: #a24e20;
+  --terracotta-soft: #f6e2d6;
+  --olive: #6b7f4e;
+  --olive-soft: #e7ecdc;
+  --sun: #e8a93b;
+
+  /* channel colours */
+  --airbnb: #e0565b;
+  --airbnb-soft: #fbe3e3;
+  --booking: #1d4f91;
+  --booking-soft: #dfe8f5;
+  --direct: #c4622d;
+  --direct-soft: #f6e2d6;
+  --manual: #6b7f4e;
+  --manual-soft: #e7ecdc;
+
+  --danger: #b3261e;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(31,42,36,.06), 0 8px 24px rgba(31,42,36,.07);
+  --serif: 'Fraunces', Georgia, serif;
+  --sans: 'Inter', system-ui, -apple-system, Segoe UI, sans-serif;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { font-family: var(--sans); color: var(--ink); background: var(--cream); -webkit-font-smoothing: antialiased; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; letter-spacing: -.01em; margin: 0; }
+a { color: var(--terracotta-dark); }
+button, input, select, textarea { font: inherit; color: inherit; }
+
+.btn { display: inline-flex; align-items: center; gap: .45rem; border: 1px solid var(--line); background: var(--paper);
+  padding: .55rem 1rem; border-radius: 999px; cursor: pointer; font-weight: 500; font-size: .9rem; transition: .15s; }
+.btn:hover { border-color: var(--ink-2); }
+.btn.primary { background: var(--terracotta); border-color: var(--terracotta); color: #fff; }
+.btn.primary:hover { background: var(--terracotta-dark); }
+.btn.ghost { background: transparent; }
+.btn.danger { color: var(--danger); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.field { display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; font-weight: 500; color: var(--ink-2); }
+.field input, .field select, .field textarea { border: 1px solid var(--line); background: #fff; border-radius: 10px;
+  padding: .6rem .75rem; font-weight: 400; color: var(--ink); outline: none; }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--terracotta); box-shadow: 0 0 0 3px var(--terracotta-soft); }
+
+.chip { display: inline-flex; align-items: center; gap: .35rem; padding: .15rem .6rem; border-radius: 999px;
+  font-size: .75rem; font-weight: 600; white-space: nowrap; }
+.chip::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.chip.airbnb { background: var(--airbnb-soft); color: var(--airbnb); }
+.chip.booking { background: var(--booking-soft); color: var(--booking); }
+.chip.direct { background: var(--direct-soft); color: var(--direct); }
+.chip.manual { background: var(--manual-soft); color: var(--manual); }
