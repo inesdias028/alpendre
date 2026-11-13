@@ -70,6 +70,26 @@ async function fetchText(url) {
   finally { clearTimeout(t); }
 }
 
+// ---------- passwords (PBKDF2, the strongest setting Workers allow) ----------
+const enc = new TextEncoder();
+const toHex = b => [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+const fromHex = h => new Uint8Array(h.match(/../g).map(x => parseInt(x, 16)));
+async function hashPassword(pw, saltHex) {
+  const salt = saltHex ? fromHex(saltHex) : crypto.getRandomValues(new Uint8Array(16));
+  const key = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 100000 }, key, 256);
+  return { salt: toHex(salt), hash: toHex(new Uint8Array(bits)) };
+}
+async function sameSecret(a, b) {
+  const [x, y] = await Promise.all([crypto.subtle.digest('SHA-256', enc.encode(String(a))), crypto.subtle.digest('SHA-256', enc.encode(String(b)))]);
+  return crypto.subtle.timingSafeEqual(x, y);
+}
+const slug = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9.]+/g, '').slice(0, 40);
+const INVITE_DAYS = 7;
+const OWNER = { id: 'owner', name: 'Owner' };
+const publicUser = u => ({ id: u.id, name: u.name, login: u.login, email: u.email || '', role: u.role, createdAt: u.createdAt, createdBy: u.createdBy,
+  status: u.passHash ? 'active' : (u.inviteExp > Date.now() ? 'invited' : 'invite expired'), inviteExp: u.passHash ? null : u.inviteExp });
+
 // ---------- HTTP helpers ----------
 const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...headers } });
 const PUBLIC_CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' };
@@ -106,24 +126,28 @@ export class Alpendre extends DurableObject {
   // ---------- storage ----------
   async load() {
     const all = await this.ctx.storage.list();
-    this.db = { settings: { syncMinutes: 30, lastAutoSync: null }, workspaces: [], reservations: [], log: [] };
+    this.db = { settings: { syncMinutes: 30, lastAutoSync: null }, workspaces: [], reservations: [], log: [], users: [] };
     for (const [k, v] of all) {
       if (k === 'settings') this.db.settings = { ...this.db.settings, ...v };
       else if (k === 'log') this.db.log = v;
       else if (k.startsWith('w:')) this.db.workspaces.push(v);
       else if (k.startsWith('r:')) this.db.reservations.push(v);
+      else if (k.startsWith('u:')) this.db.users.push(v);
     }
+    this.db.users.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     this.db.workspaces.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     if (!all.has('settings')) { this.seed(); this.touch('settings'); await this.save(); }
   }
   touch(key) { this.dirty.add(key); this.gone.delete(key); }
   touchW(w) { this.touch('w:' + w.id); }
   touchR(r) { this.touch('r:' + r.id); }
+  touchU(u) { this.touch('u:' + u.id); }
   drop(key) { this.gone.add(key); this.dirty.delete(key); }
   async save() {
     const map = {
       settings: () => this.db.settings, log: () => this.db.log,
       w: k => this.db.workspaces.find(w => 'w:' + w.id === k), r: k => this.db.reservations.find(r => 'r:' + r.id === k),
+      u: k => this.db.users.find(u => 'u:' + u.id === k),
     };
     const entries = {};
     for (const k of this.dirty) {
@@ -137,7 +161,7 @@ export class Alpendre extends DurableObject {
     for (let i = 0; i < del.length; i += 128) await this.ctx.storage.delete(del.slice(i, i + 128));
   }
   log(workspaceId, msg, level = 'info') {
-    this.db.log.unshift({ at: new Date().toISOString(), workspaceId, level, msg });
+    this.db.log.unshift({ at: new Date().toISOString(), workspaceId, level, msg, by: this.actor ? this.actor.name : null });
     this.db.log = this.db.log.slice(0, 300); this.touch('log');
   }
   house(wid) { return this.db.workspaces.find(w => w.id === wid); }
@@ -266,19 +290,43 @@ export class Alpendre extends DurableObject {
   }
 
   // ---------- auth ----------
-  async authed(req) {
+  // Returns the signed-in person ({ id, name }) or null.
+  async sessionUser(req) {
     const m = (req.headers.get('Authorization') || '').match(/^Bearer ([a-f0-9]{48})$/);
-    if (!m) return false;
+    if (!m) return null;
     const s = await this.ctx.storage.get('s:' + m[1]);
-    return !!s && s.exp > Date.now();
+    if (!s || s.exp < Date.now()) return null;
+    if (!s.userId || s.userId === 'owner') return OWNER;
+    const u = this.db.users.find(x => x.id === s.userId);
+    return u && u.passHash ? { id: u.id, name: u.name } : null;
   }
-  async passwordOk(given) {
-    const expected = this.env.ALPENDRE_PASSWORD || '';
-    if (!expected) return false;
-    const enc = new TextEncoder();
-    const [a, b] = await Promise.all([crypto.subtle.digest('SHA-256', enc.encode(String(given))), crypto.subtle.digest('SHA-256', enc.encode(expected))]);
-    return crypto.subtle.timingSafeEqual(a, b);
+  async newSession(userId) {
+    const t = hex(24);
+    await this.ctx.storage.put('s:' + t, { exp: Date.now() + SESSION_DAYS * 864e5, userId });
+    return t;
   }
+  async endSessionsOf(userId) {
+    const all = await this.ctx.storage.list({ prefix: 's:' });
+    const keys = [...all].filter(([, v]) => v.userId === userId).map(([k]) => k);
+    for (let i = 0; i < keys.length; i += 128) await this.ctx.storage.delete(keys.slice(i, i + 128));
+  }
+  findUser(login) {
+    const l = String(login || '').trim().toLowerCase();
+    return l ? this.db.users.find(u => u.login === l || (u.email && u.email.toLowerCase() === l)) : null;
+  }
+  async checkLogin(login, password) {
+    const l = String(login || '').trim().toLowerCase();
+    if (!l || l === 'owner') return this.env.ALPENDRE_PASSWORD && (await sameSecret(password, this.env.ALPENDRE_PASSWORD)) ? OWNER : null;
+    const u = this.findUser(l);
+    if (!u || !u.passHash) { await hashPassword(String(password), '00'.repeat(16)); return null; } // same work either way
+    const h = await hashPassword(String(password), u.salt);
+    return (await sameSecret(h.hash, u.passHash)) ? { id: u.id, name: u.name } : null;
+  }
+  async setPassword(u, pw) {
+    const h = await hashPassword(pw); u.passHash = h.hash; u.salt = h.salt;
+    delete u.inviteToken; delete u.inviteExp; this.touchU(u);
+  }
+  newInvite(u) { u.inviteToken = hex(24); u.inviteExp = Date.now() + INVITE_DAYS * 864e5; this.touchU(u); return u.inviteToken; }
 
   // ---------- requests ----------
   async fetch(req) {
@@ -354,25 +402,83 @@ export class Alpendre extends DurableObject {
     const cors = ownerCors(req, env);
     if (m === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     if (p === '/api/login' && m === 'POST') {
-      if (!env.ALPENDRE_PASSWORD) return json({ error: 'No password set on the server yet. Run: npx wrangler secret put ALPENDRE_PASSWORD' }, 503, cors);
       const b = await readBody(req);
-      if (!(await this.passwordOk(b.password || ''))) { await new Promise(r => setTimeout(r, 600)); return json({ error: 'Wrong password' }, 401, cors); }
-      const t = hex(24);
-      await this.ctx.storage.put('s:' + t, { exp: Date.now() + SESSION_DAYS * 864e5 });
-      return json({ ok: true, token: t }, 200, cors);
+      if (!String(b.login || '').trim() && !env.ALPENDRE_PASSWORD) return json({ error: 'No password set on the server yet. Run: npx wrangler secret put ALPENDRE_PASSWORD' }, 503, cors);
+      const who = await this.checkLogin(b.login, b.password || '');
+      if (!who) { await new Promise(r => setTimeout(r, 600)); return json({ error: 'Wrong username or password' }, 401, cors); }
+      return json({ ok: true, token: await this.newSession(who.id), user: who }, 200, cors);
     }
     if (p === '/api/logout' && m === 'POST') {
       const mm = (req.headers.get('Authorization') || '').match(/^Bearer ([a-f0-9]{48})$/);
       if (mm) await this.ctx.storage.delete('s:' + mm[1]);
       return json({ ok: true }, 200, cors);
     }
+    // invite links: open without signing in, the token is the proof
+    const inv = p.match(/^\/api\/invite\/([a-f0-9]{48})$/);
+    if (inv) {
+      const u = this.db.users.find(x => x.inviteToken === inv[1] && x.inviteExp > Date.now());
+      if (!u) return json({ error: 'This invite link has expired or was already used. Ask for a new one.' }, 404, cors);
+      if (m === 'GET') return json({ name: u.name, login: u.login }, 200, cors);
+      if (m === 'POST') {
+        const b = await readBody(req);
+        if (String(b.password || '').length < 8) return json({ error: 'Use at least 8 characters.' }, 400, cors);
+        await this.setPassword(u, String(b.password));
+        this.actor = { id: u.id, name: u.name }; this.log(null, `${u.name} accepted the invite`);
+        await this.save();
+        return json({ ok: true, token: await this.newSession(u.id), user: this.actor }, 200, cors);
+      }
+    }
     if (!p.startsWith('/api/')) return new Response('Not found', { status: 404 });
-    if (!(await this.authed(req))) return json({ error: 'Not signed in' }, 401, cors);
+    this.actor = await this.sessionUser(req);
+    if (!this.actor) return json({ error: 'Not signed in' }, 401, cors);
+
+    // people (everyone has full access, including managing people)
+    if (p === '/api/users' && m === 'GET') return json({ me: this.actor, users: this.db.users.map(publicUser) }, 200, cors);
+    if (p === '/api/users' && m === 'POST') {
+      const b = await readBody(req);
+      const name = String(b.name || '').trim().slice(0, 80);
+      if (name.length < 2) return json({ error: 'Enter a name.' }, 400, cors);
+      const login = slug(String(b.login || '').trim() || name.split(/\s+/)[0]);
+      if (!login || login === 'owner') return json({ error: 'Choose another username.' }, 400, cors);
+      if (this.findUser(login)) return json({ error: `The username “${login}” is taken.` }, 400, cors);
+      const email = String(b.email || '').trim().slice(0, 200);
+      if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'That email does not look right.' }, 400, cors);
+      if (email && this.findUser(email)) return json({ error: 'Someone already uses that email.' }, 400, cors);
+      const u = { id: id(), name, login, email, role: 'admin', createdAt: new Date().toISOString(), createdBy: this.actor.name };
+      this.db.users.push(u); const t = this.newInvite(u);
+      this.log(null, `Invited ${name} (${login})`); await this.save();
+      return json({ user: publicUser(u), inviteToken: t }, 201, cors);
+    }
+    const um = p.match(/^\/api\/users\/([a-f0-9]+)(\/invite)?$/);
+    if (um) {
+      const u = this.db.users.find(x => x.id === um[1]);
+      if (!u) return json({ error: 'Person not found' }, 404, cors);
+      if (um[2] && m === 'POST') { // a fresh invite link is also how a forgotten password is reset
+        if (u.id === this.actor.id) return json({ error: 'Use “Change my password” instead.' }, 400, cors);
+        delete u.passHash; delete u.salt; const t = this.newInvite(u);
+        await this.endSessionsOf(u.id); this.log(null, `New invite link for ${u.name}`); await this.save();
+        return json({ user: publicUser(u), inviteToken: t }, 200, cors);
+      }
+      if (!um[2] && m === 'DELETE') {
+        if (u.id === this.actor.id) return json({ error: 'You cannot remove yourself.' }, 400, cors);
+        this.db.users = this.db.users.filter(x => x.id !== u.id); this.drop('u:' + u.id);
+        await this.endSessionsOf(u.id); this.log(null, `Removed ${u.name}`); await this.save();
+        return json({ ok: true }, 200, cors);
+      }
+    }
+    if (p === '/api/me/password' && m === 'POST') {
+      if (this.actor.id === 'owner') return json({ error: 'The owner password is changed with: npx wrangler secret put ALPENDRE_PASSWORD' }, 400, cors);
+      const b = await readBody(req), u = this.db.users.find(x => x.id === this.actor.id);
+      if (!(await this.checkLogin(u.login, b.current || ''))) return json({ error: 'Your current password is wrong.' }, 400, cors);
+      if (String(b.next || '').length < 8) return json({ error: 'Use at least 8 characters.' }, 400, cors);
+      await this.setPassword(u, String(b.next)); await this.save();
+      return json({ ok: true }, 200, cors);
+    }
 
     const db = this.db;
     if (p === '/api/state' && m === 'GET') {
       const reservations = db.reservations.map(r => ({ ...r, conflicts: r.status === 'cancelled' ? [] : this.conflictsFor(r, r.workspaceId).map(o => o.id) }));
-      return json({ settings: db.settings, workspaces: db.workspaces, reservations, log: db.log, today: today(), defaultPassword: false, apiOrigin: url.origin }, 200, cors);
+      return json({ settings: db.settings, workspaces: db.workspaces, reservations, log: db.log, today: today(), defaultPassword: false, apiOrigin: url.origin, me: this.actor, users: db.users.map(publicUser) }, 200, cors);
     }
     if (p === '/api/workspaces' && m === 'POST') {
       const b = await readBody(req), w = newHouse({}, db.workspaces.length);

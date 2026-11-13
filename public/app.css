@@ -266,3 +266,8 @@ details ol { padding-left: 1.2rem; margin: .5rem 0 0; line-height: 1.55; }
   .tl { grid-template-columns: 110px repeat(var(--days), 30px); min-width: calc(110px + var(--days) * 30px); }
 }
 @media (min-width: 761px) { .side nav.mnav { display: none; } }
+
+/* people */
+.avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--terracotta-soft); color: var(--terracotta-dark); display: grid; place-items: center; font-weight: 700; font-size: .8rem; flex: none; }
+.side-foot .me { font-size: .78rem; color: #a9a497; text-align: center; padding-bottom: .2rem; }
+.login-card .help { text-align: left; }

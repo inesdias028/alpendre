@@ -45,10 +45,39 @@ async function refresh() { S.state = await api('/api/state'); render(); }
 function showLogin() { $('#app').hidden = true; $('#login').hidden = false; }
 $('#loginForm').addEventListener('submit', async e => {
   e.preventDefault();
-  try { const d = await api('/api/login', { method: 'POST', body: { password: e.target.password.value } }); setToken(d.token); $('#login').hidden = true; $('#app').hidden = false; await refresh(); }
+  if (S.route.name === 'invite') return; // the invite page handles its own submit
+  try { const d = await api('/api/login', { method: 'POST', body: { login: e.target.login.value, password: e.target.password.value } }); setToken(d.token); $('#login').hidden = true; $('#app').hidden = false; await refresh(); }
   catch (err) { $('#loginErr').textContent = err.message; }
 });
 $('#logout').addEventListener('click', async () => { try { await api('/api/logout', { method: 'POST' }); } catch { /* already signed out */ } setToken(''); showLogin(); });
+
+// ---------- invite page ----------
+async function showInvite(tokenId) {
+  $('#app').hidden = true; $('#login').hidden = false;
+  const card = $('.login-card');
+  let info;
+  try { info = await api('/api/invite/' + tokenId); }
+  catch (e) {
+    card.innerHTML = `<img src="logo.svg" alt="" width="56" height="56"><h1>Alpendre</h1><p>${esc(e.message)}</p><a class="btn primary" href="${location.pathname}">Go to sign in</a>`;
+    return;
+  }
+  card.innerHTML = `<img src="logo.svg" alt="" width="56" height="56"><h1>Welcome, ${esc(info.name.split(' ')[0])}</h1>
+    <p>Choose a password for Alpendre. You'll sign in with the username <b>${esc(info.login)}</b>.</p>
+    <label class="field">Username<input name="login" value="${esc(info.login)}" autocomplete="username" readonly></label>
+    <label class="field">New password<input type="password" name="password" autocomplete="new-password" minlength="8" required autofocus><span class="help">At least 8 characters.</span></label>
+    <label class="field">Repeat password<input type="password" name="again" autocomplete="new-password" required></label>
+    <p class="err" id="inviteErr"></p><button class="btn primary" type="submit">Set password and sign in</button>`;
+  card.onsubmit = async e => {
+    e.preventDefault(); e.stopImmediatePropagation();
+    const f = e.target;
+    if (f.password.value.length < 8) return void ($('#inviteErr').textContent = 'Use at least 8 characters.');
+    if (f.password.value !== f.again.value) return void ($('#inviteErr').textContent = 'The two passwords are different.');
+    try {
+      const d = await api('/api/invite/' + tokenId, { method: 'POST', body: { password: f.password.value } });
+      setToken(d.token); location.replace(location.pathname + '#/'); location.reload();
+    } catch (err) { $('#inviteErr').textContent = err.message; }
+  };
+}
 
 // ---------- data helpers ----------
 const houses = () => S.state.workspaces;
@@ -71,10 +100,11 @@ function parseRoute() {
   const h = location.hash.replace(/^#\/?/, '');
   const parts = h.split('/');
   if (parts[0] === 'settings') return { name: 'settings' };
+  if (parts[0] === 'invite' && parts[1]) return { name: 'invite', token: parts[1] };
   if (parts[0] === 'h' && parts[1]) return { name: 'house', hid: parts[1], view: parts[2] || 'overview' };
   return { name: 'home' };
 }
-window.addEventListener('hashchange', () => { const prev = S.route.hid; S.route = parseRoute(); if (S.route.hid !== prev) S.month = null; render(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => { if (parseRoute().name === 'invite') return void showInvite(parseRoute().token); const prev = S.route.hid; S.route = parseRoute(); if (S.route.hid !== prev) S.month = null; render(); window.scrollTo(0, 0); });
 const HOUSE_VIEWS = { overview: 'Overview', calendar: 'Calendar', reservations: 'Reservations', channels: 'Connections', settings: 'House settings' };
 
 function render() {
@@ -82,6 +112,7 @@ function render() {
   const r = S.route;
   if (r.name === 'house' && (!houseById(r.hid) || !HOUSE_VIEWS[r.view])) { location.hash = '#/'; return; }
   renderSide();
+  $('#me').textContent = S.state.me ? 'Signed in as ' + S.state.me.name : '';
   const pending = live().filter(x => x.status === 'pending').length;
   $('#pendingBadge').hidden = !pending; $('#pendingBadge').textContent = pending;
   let title, sub = '', crumb = '', html;
@@ -374,7 +405,7 @@ const HOUSE = {
         <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn primary" id="saveChannels">Save connections</button><button class="btn" id="syncHouse">Sync this house now</button></div>
         <details style="margin-top:1rem"><summary>Export links leaked?</summary><p>Replacing them makes the old links stop working. You'll need to paste the new ones into Airbnb, Booking.com and your website again.</p><button class="btn small danger" id="rotate">Replace export links</button></details>
       </div>
-      <div class="card"><h2>Activity</h2><ul class="log">${S.state.log.filter(l => l.workspaceId === w.id).slice(0, 40).map(l => `<li><time>${new Date(l.at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</time><span class="${l.level}">${esc(l.msg)}</span></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul></div>
+      <div class="card"><h2>Activity</h2><ul class="log">${S.state.log.filter(l => l.workspaceId === w.id).slice(0, 40).map(l => `<li><time>${new Date(l.at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</time><span class="${l.level}">${esc(l.msg)}${l.by ? ` <span style="color:var(--muted)">· ${esc(l.by)}</span>` : ''}</span></li>`).join('') || '<li class="empty">Nothing yet.</li>'}</ul></div>
     </div>`;
   },
 
@@ -406,9 +437,27 @@ function readHouseForm() {
   return b;
 }
 
+function peopleCard() {
+  const me = S.state.me || {}, users = S.state.users || [];
+  const row = (name, sub, status, actions) => `<li style="display:flex;align-items:center;gap:.8rem;padding:.7rem 0;border-top:1px solid var(--line)">
+    <div class="avatar">${esc(name.split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase())}</div>
+    <div style="flex:1;min-width:0"><div style="font-weight:600">${esc(name)}</div><div class="help" style="margin:0">${sub}</div></div>
+    ${status}${actions}</li>`;
+  const badge = (t, cls) => `<span class="tag ${cls}">${t}</span>`;
+  return `<div class="card" style="margin-top:1rem"><h2>People <small>everyone here has full access</small></h2>
+    <ul style="list-style:none;margin:0;padding:0">
+      ${row('Owner', 'Signs in with the owner password (leave the username empty)', badge('owner', 'in'), '')}
+      ${users.map(u => row(u.name, `username <b>${esc(u.login)}</b>${u.email ? ' · ' + esc(u.email) : ''}${u.createdBy ? ' · added by ' + esc(u.createdBy) : ''}`,
+        u.status === 'active' ? badge('active', 'in') : badge(u.status === 'invited' ? 'invite sent' : 'invite expired', 'out'),
+        u.id === me.id ? '<span class="help" style="margin:0">you</span>' : `<button class="btn small" data-reinvite="${u.id}" title="Make a new invite link (also resets a forgotten password)">${u.status === 'active' ? 'Reset password' : 'New link'}</button><button class="btn small danger" data-remove-user="${u.id}">Remove</button>`)).join('')}
+    </ul>
+    <div style="display:flex;gap:.5rem;margin-top:1rem;flex-wrap:wrap"><button class="btn primary" id="inviteBtn">+ Invite a person</button>
+    ${me.id && me.id !== 'owner' ? '<button class="btn" id="changePw">Change my password</button>' : ''}</div></div>`;
+}
+
 function viewSettings() {
   const s = S.state.settings;
-  return `<div class="grid two" style="margin-top:0">
+  return peopleCard() + `<div class="grid two">
     <div class="card"><h2>Calendar sync</h2>
       <label class="field">Check every connected calendar every<select id="syncMinutes">${[15, 30, 60, 180].map(m => `<option value="${m}" ${s.syncMinutes == m ? 'selected' : ''}>${m < 60 ? m + ' minutes' : m / 60 + ' hour' + (m > 60 ? 's' : '')}</option>`).join('')}</select></label>
       <div style="margin-top:1rem"><button class="btn primary" id="saveSettings">Save</button></div></div>
@@ -469,6 +518,18 @@ const AFTER = {
       };
       return;
     }
+    $('#inviteBtn').onclick = openInviteDrawer;
+    const cp = $('#changePw'); if (cp) cp.onclick = openPasswordDrawer;
+    $$('[data-reinvite]').forEach(b => b.onclick = async () => {
+      const u = S.state.users.find(x => x.id === b.dataset.reinvite);
+      if (u.status === 'active' && !confirm(`Reset ${u.name}'s password? They are signed out and need the new link to choose a password again.`)) return;
+      try { const d = await api(`/api/users/${u.id}/invite`, { method: 'POST' }); await refresh(); showInviteLink(d.user, d.inviteToken); } catch (e) { toast(e.message); }
+    });
+    $$('[data-remove-user]').forEach(b => b.onclick = async () => {
+      const u = S.state.users.find(x => x.id === b.dataset.removeUser);
+      if (!confirm(`Remove ${u.name}? They lose access straight away.`)) return;
+      try { await api('/api/users/' + u.id, { method: 'DELETE' }); toast(`${u.name} removed`); await refresh(); } catch (e) { toast(e.message); }
+    });
     $('#saveSettings').onclick = async () => { await api('/api/settings', { method: 'PUT', body: { syncMinutes: +$('#syncMinutes').value } }); toast('Saved'); await refresh(); };
     const c = $('#clearDemo'); if (c) c.onclick = async () => {
       if (!confirm('Remove the demo houses and their reservations? Houses you created stay.')) return;
@@ -570,7 +631,57 @@ function openDrawer(id, opts = {}) {
   on('#delRes', async () => { if (!confirm('Delete this reservation for good?')) return; await api('/api/reservations/' + id, { method: 'DELETE' }); closeDrawer(); toast('Deleted'); await refresh(); });
 }
 
+// ---------- people drawers ----------
+const inviteUrl = t => `${location.origin}${location.pathname}#/invite/${t}`;
+function openInviteDrawer() {
+  showDrawer(`<header><div><h2>Invite a person</h2><p class="sub">They get full access to every house.</p></div><button class="x" id="closeDr" aria-label="Close">×</button></header>
+    <form class="body" id="inviteForm">
+      <label class="field">Full name<input name="name" required maxlength="80" autocomplete="off"></label>
+      <label class="field">Username<input name="login" maxlength="40" autocapitalize="none" spellcheck="false" placeholder="first name, if left empty"><span class="help">What they type to sign in.</span></label>
+      <label class="field">Email <span style="font-weight:400;color:var(--muted)">(optional)</span><input name="email" type="email" autocomplete="off"><span class="help">They can also sign in with it.</span></label>
+      <div class="note">You'll get a link to send them. They open it and choose their own password, so you never need to know it. The link works once and expires after 7 days.</div>
+    </form>
+    <footer><button class="btn" id="cancelDr">Cancel</button><button class="btn primary" id="createInvite">Create invite link</button></footer>`);
+  $('#cancelDr').onclick = closeDrawer;
+  const f = $('#inviteForm');
+  f.name.oninput = () => { if (!f.login.dataset.touched) f.login.value = f.name.value.trim().split(/\s+/)[0].normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9.]/g, ''); };
+  f.login.oninput = () => { f.login.dataset.touched = '1'; };
+  setTimeout(() => f.name.focus(), 50);
+  $('#createInvite').onclick = async () => {
+    try { const d = await api('/api/users', { method: 'POST', body: Object.fromEntries(new FormData(f)) }); await refresh(); showInviteLink(d.user, d.inviteToken); }
+    catch (e) { toast(e.message); }
+  };
+}
+function showInviteLink(user, t) {
+  const link = inviteUrl(t);
+  const mail = `mailto:${encodeURIComponent(user.email || '')}?subject=${encodeURIComponent('Your Alpendre access')}&body=${encodeURIComponent(`Hi ${user.name.split(' ')[0]},\n\nYou now have access to Alpendre, where we manage the houses and their reservations.\n\nOpen this link to choose your password (it works once, within 7 days):\n${link}\n\nYour username is: ${user.login}\n`)}`;
+  showDrawer(`<header><div><h2>Invite ready</h2><p class="sub">${esc(user.name)} · username <b>${esc(user.login)}</b></p></div><button class="x" id="closeDr" aria-label="Close">×</button></header>
+    <div class="body">
+      <p style="margin:0">Send this link to ${esc(user.name.split(' ')[0])}. Opening it lets them choose a password and signs them in.</p>
+      <div class="copy"><input readonly value="${esc(link)}"><button class="btn small" id="copyInvite">Copy</button></div>
+      <a class="btn" href="${esc(mail)}" style="align-self:flex-start;text-decoration:none">Write an email with the link</a>
+      <div class="note">Anyone with this link can claim the account, so only send it to ${esc(user.name.split(' ')[0])}. It expires in 7 days. If it gets lost, use <b>New link</b> in People.</div>
+    </div>
+    <footer><button class="btn primary" id="doneDr">Done</button></footer>`);
+  $('#doneDr').onclick = closeDrawer;
+  $('#copyInvite').onclick = async () => { try { await navigator.clipboard.writeText(link); toast('Link copied'); } catch { toast('Select the link and press Ctrl+C'); } };
+}
+function openPasswordDrawer() {
+  showDrawer(`<header><div><h2>Change my password</h2></div><button class="x" id="closeDr" aria-label="Close">×</button></header>
+    <form class="body" id="pwForm">
+      <label class="field">Current password<input type="password" name="current" autocomplete="current-password" required></label>
+      <label class="field">New password<input type="password" name="next" autocomplete="new-password" minlength="8" required><span class="help">At least 8 characters.</span></label>
+    </form>
+    <footer><button class="btn" id="cancelDr">Cancel</button><button class="btn primary" id="savePw">Change password</button></footer>`);
+  $('#cancelDr').onclick = closeDrawer;
+  $('#savePw').onclick = async () => {
+    try { await api('/api/me/password', { method: 'POST', body: Object.fromEntries(new FormData($('#pwForm'))) }); closeDrawer(); toast('Password changed'); }
+    catch (e) { toast(e.message); }
+  };
+}
+
 // ---------- boot ----------
 S.route = parseRoute();
-if (!TOKEN) showLogin();
+if (S.route.name === 'invite') showInvite(S.route.token);
+else if (!TOKEN) showLogin();
 else api('/api/state').then(st => { S.state = st; $('#app').hidden = false; render(); }).catch(e => { if (e.message !== 'Signed out') { showLogin(); $('#loginErr').textContent = e.message; } });

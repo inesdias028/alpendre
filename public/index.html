@@ -15,7 +15,8 @@
     <img src="logo.svg" alt="" width="56" height="56">
     <h1>Alpendre</h1>
     <p>Every booking, one porch.</p>
-    <label class="field">Password<input type="password" name="password" autocomplete="current-password" autofocus required></label>
+    <label class="field">Username<input name="login" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus><span class="help">Owner: leave empty and use the owner password.</span></label>
+    <label class="field">Password<input type="password" name="password" autocomplete="current-password" required></label>
     <p class="err" id="loginErr"></p>
     <button class="btn primary" type="submit">Sign in</button>
   </form>
@@ -32,6 +33,7 @@
     <div class="houses" id="houseNav"></div>
     <button class="add-house" id="addHouse">+ Add a house</button>
     <div class="side-foot">
+      <div class="me" id="me"></div>
       <a class="btn ghost small" href="#/settings">Settings</a>
       <button class="btn ghost small" id="logout">Sign out</button>
     </div>
