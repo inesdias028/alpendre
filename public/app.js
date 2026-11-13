@@ -113,7 +113,9 @@ function render() {
   if (!S.state) return;
   const r = S.route;
   if (r.name === 'house' && (!houseById(r.hid) || !HOUSE_VIEWS[r.view])) { location.hash = '#/'; return; }
+  if (r.hid) { S.lastHouse = r.hid; try { localStorage.setItem('alp_house', r.hid); } catch { /* ignore */ } }
   renderSide();
+  renderPhoneBars();
   $('#me').textContent = S.state.me ? 'Signed in as ' + S.state.me.name : '';
   const pending = live().filter(x => x.status === 'pending').length;
   $('#pendingBadge').hidden = !pending; $('#pendingBadge').textContent = pending;
@@ -155,6 +157,70 @@ function renderSide() {
   $('#mnav').innerHTML = `<a href="#/" class="${r.name === 'home' ? 'active' : ''}">Houses</a>` +
     (r.name === 'house' ? Object.entries(HOUSE_VIEWS).map(([k, v]) => `<a href="#/h/${r.hid}/${k}" class="${r.view === k ? 'active' : ''}">${v}</a>`).join('') : '') +
     `<a href="#/settings" class="${r.name === 'settings' ? 'active' : ''}">Settings</a>`;
+}
+
+// ---------- phone: top bar, bottom tabs, + button ----------
+const ICON = {
+  home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  bookings: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+  links: '<path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/>',
+  more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+  sync: '<path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/>',
+  down: '<path d="M6 9l6 6 6-6"/>',
+};
+const svg = (k, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}">${ICON[k]}</svg>`;
+function currentHouse() {
+  let id = S.route.hid || S.lastHouse;
+  if (!id) try { id = localStorage.getItem('alp_house'); } catch { /* ignore */ }
+  return houseById(id) || houses()[0] || null;
+}
+function renderPhoneBars() {
+  const r = S.route, w = r.name === 'house' ? houseById(r.hid) : null, cur = currentHouse();
+  const pending = live(cur ? cur.id : undefined).filter(x => x.status === 'pending').length;
+  $('#appbar').innerHTML = `<a href="#/" class="ab-logo" aria-label="All houses"><img src="logo.svg" alt="" width="30" height="30"></a>
+    <button class="ab-ctx" id="ctxBtn">${w ? `<span class="dot" style="background:${w.color}"></span>${esc(w.name)}` : r.name === 'settings' ? 'Settings' : 'All houses'}${svg('down', 16)}</button>
+    <button class="ab-sync" id="abSync" aria-label="Sync now">${svg('sync', 20)}</button>`;
+  const tab = (href, icon, label, on, badge = 0, off = false) => off ? `<span class="off">${svg(icon)}<span>${label}</span></span>`
+    : `<a href="${href}" class="${on ? 'active' : ''}">${svg(icon)}<span>${label}</span>${badge ? `<b class="tb-badge">${badge}</b>` : ''}</a>`;
+  const h = cur ? `#/h/${cur.id}` : '#/', none = !cur, v = r.name === 'house' ? r.view : '';
+  $('#tabbar').innerHTML = tab('#/', 'home', 'Home', r.name === 'home' || v === 'overview')
+    + tab(h + '/calendar', 'calendar', 'Calendar', v === 'calendar', 0, none)
+    + tab(h + '/reservations', 'bookings', 'Bookings', v === 'reservations', pending, none)
+    + tab(h + '/channels', 'links', 'Connections', v === 'channels', 0, none)
+    + `<button type="button" id="moreBtn" class="${r.name === 'settings' || v === 'settings' ? 'active' : ''}">${svg('more')}<span>More</span></button>`;
+  $('#fab').hidden = r.name === 'settings' || v === 'settings' || v === 'channels' || !houses().length;
+  $('#ctxBtn').onclick = openHouseSwitcher;
+  $('#abSync').onclick = () => doSync(r.name === 'house' ? r.hid : null);
+  $('#moreBtn').onclick = openMoreSheet;
+}
+$('#fab').onclick = () => { const c = currentHouse(); openDrawer(null, { hid: S.route.hid || (c && c.id), day: S.state.today }); };
+function sheet(title, items) {
+  showDrawer(`<header><div><h2>${title}</h2></div><button class="x" id="closeDr" aria-label="Close">×</button></header>
+    <div class="body sheet-list">${items.join('')}</div>`);
+  $('#drawer').classList.add('is-sheet');
+  $$('#drawer [data-sheet-go]').forEach(a => a.onclick = () => { closeDrawer(); location.hash = a.dataset.sheetGo; });
+}
+function openHouseSwitcher() {
+  const cur = S.route.name === 'house' ? S.route.hid : null;
+  sheet('Choose a house', [
+    `<button class="sheet-item ${!cur ? 'on' : ''}" data-sheet-go="#/"><span class="dot" style="background:var(--ink)"></span>All houses</button>`,
+    ...houses().map(w => `<button class="sheet-item ${cur === w.id ? 'on' : ''}" data-sheet-go="#/h/${w.id}/${S.route.view && S.route.name === 'house' ? S.route.view : 'overview'}"><span class="dot" style="background:${w.color}"></span><span>${esc(w.name)}<small>${esc(w.location || '')}</small></span></button>`),
+    `<button class="sheet-item add" id="sheetAdd">+ Add a house</button>`,
+  ]);
+  $('#sheetAdd').onclick = () => { closeDrawer(); openHouseDrawer(); };
+}
+function openMoreSheet() {
+  const c = currentHouse();
+  sheet('More', [
+    c ? `<button class="sheet-item" data-sheet-go="#/h/${c.id}/settings"><span class="dot" style="background:${c.color}"></span>House settings · ${esc(c.name)}</button>` : '',
+    `<button class="sheet-item" data-sheet-go="#/settings">${isOwner() ? 'Settings, people &amp; emails' : 'My account'}</button>`,
+    `<button class="sheet-item" id="sheetAdd">+ Add a house</button>`,
+    `<p class="help" style="margin:.8rem .2rem .2rem">${S.state.me ? 'Signed in as <b>' + esc(S.state.me.name) + '</b>' : ''}</p>`,
+    `<button class="sheet-item danger" id="sheetOut">Sign out</button>`,
+  ]);
+  $('#sheetAdd').onclick = () => { closeDrawer(); openHouseDrawer(); };
+  $('#sheetOut').onclick = () => { closeDrawer(); $('#logout').click(); };
 }
 
 // ---------- home ----------
@@ -234,6 +300,18 @@ function timeline() {
     <div class="tl-scroll"><div class="tl" style="--days:${N}">${head}${rows}</div></div>`;
 }
 const barClass = (r, contL, contR) => [r.source, r.status === 'pending' && 'pending', r.status === 'blocked' && 'blocked', r.conflicts.length && 'conflict', contL && 'cont-l', contR && 'cont-r'].filter(Boolean).join(' ');
+
+// Stays as tappable cards: the phone version of the calendar and the bookings table.
+function agenda(list, w, empty = 'No stays this month.') {
+  if (!list.length) return `<div class="agenda"><p class="empty">${empty}</p></div>`;
+  return `<div class="agenda">${list.map(r => `<button class="ag-item ${r.source}" data-open="${r.id}">
+      <div class="ag-dates"><b>${D(r.checkIn).getUTCDate()}</b><span>${MONTHS[D(r.checkIn).getUTCMonth()]}</span></div>
+      <div class="ag-main"><div class="ag-name">${r.guestName ? esc(r.guestName) : `<span class="missing">${SOURCES[r.source]} guest</span>`}${r.conflicts.length ? ' <span class="warn-dot">⚠</span>' : ''}</div>
+        <div class="ag-sub">${range(r)} · ${nightsOf(r.checkIn, r.checkOut)} nights${r.guests ? ` · ${r.guests} guests` : ''}</div>
+        <div class="ag-tags"><span class="chip ${r.source}">${SOURCES[r.source]}</span><span class="status ${r.status}">${r.status}</span></div></div>
+      <div class="ag-price">${r.price ? money(r.price, w.currency) : ''}</div>
+    </button>`).join('')}</div>`;
+}
 
 function movesList(moves, showHouse) {
   if (!moves.length) return '<p class="empty">No arrivals or departures.</p>';
@@ -329,7 +407,8 @@ const HOUSE = {
         <button class="btn small" data-month="-1" aria-label="Previous month">←</button><button class="btn small" data-month="0">Today</button><button class="btn small" data-month="1" aria-label="Next month">→</button>
         <h2>${first.toLocaleString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</h2>
         <div class="legend">${Object.keys(SOURCES).map(s => `<span class="chip ${s}">${SOURCES[s]}</span>`).join('')}</div></div>
-      <div class="cal"><div class="cal-dow">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div>${d}</div>`).join('')}</div>${html}</div>`;
+      <div class="cal"><div class="cal-dow">${['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => `<div>${d}</div>`).join('')}</div>${html}</div>
+      ${agenda(items.filter(r => r.checkIn < nextMonth(S.month) && r.checkOut > S.month).sort((a, b) => a.checkIn.localeCompare(b.checkIn)), w)}`;
   },
 
   reservations(w) {
@@ -355,7 +434,8 @@ const HOUSE = {
           <td><span class="chip ${r.source}">${SOURCES[r.source]}</span></td><td>${range(r)} ${D(r.checkIn).getUTCFullYear()}</td>
           <td class="num">${nightsOf(r.checkIn, r.checkOut)}</td><td class="num">${r.guests ?? '—'}</td><td class="num">${money(r.price, w.currency)}</td>
           <td><span class="status ${r.status}">${r.status}</span></td><td style="color:var(--muted);font-size:.8rem">${esc(r.code || '')}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">No reservations match.</td></tr>'}
-        </tbody></table></div>`;
+        </tbody></table></div>
+      ${agenda(list, w, 'No reservations match.')}`;
   },
 
   channels(w) {
@@ -565,7 +645,7 @@ document.addEventListener('click', e => {
 $('#addHouse').onclick = () => openHouseDrawer();
 
 async function doSync(hid) {
-  const b = $('#syncBtn'); b.classList.add('spin'); b.disabled = true;
+  const b = $('#syncBtn'), ab = $('#abSync'); b.classList.add('spin'); b.disabled = true; if (ab) ab.classList.add('spin');
   try {
     const { results } = await api(hid ? `/api/workspaces/${hid}/sync` : '/api/sync', { method: 'POST' });
     const done = results.filter(r => !r.skipped);
@@ -574,13 +654,13 @@ async function doSync(hid) {
     else toast(`Synced: ${done.reduce((n, r) => n + r.added, 0)} new, ${done.reduce((n, r) => n + r.updated + r.removed, 0)} changed`);
     await refresh();
   } catch (e) { toast(e.message); }
-  finally { b.classList.remove('spin'); b.disabled = false; }
+  finally { b.classList.remove('spin'); b.disabled = false; const a2 = $('#abSync'); if (a2) a2.classList.remove('spin'); }
 }
 $('#syncBtn').onclick = () => doSync(S.route.name === 'house' ? S.route.hid : null);
 $('#newBtn').onclick = () => openDrawer(null, { hid: S.route.hid, day: S.state.today });
 
 // ---------- drawers ----------
-function showDrawer(html) { const dr = $('#drawer'); dr.innerHTML = html; dr.classList.add('open'); dr.setAttribute('aria-hidden', 'false'); $('#scrim').hidden = false; $('#closeDr').onclick = closeDrawer; }
+function showDrawer(html) { const dr = $('#drawer'); dr.classList.remove('is-sheet'); dr.innerHTML = html; dr.classList.add('open'); dr.setAttribute('aria-hidden', 'false'); $('#scrim').hidden = false; $('#closeDr').onclick = closeDrawer; }
 function closeDrawer() { const dr = $('#drawer'); dr.classList.remove('open'); dr.setAttribute('aria-hidden', 'true'); $('#scrim').hidden = true; }
 $('#scrim').onclick = closeDrawer;
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
