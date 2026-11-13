@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Full-bleed app icon: the phone applies its own rounded mask. -->
+  <rect width="64" height="64" fill="#1f2a24"/>
+  <g transform="translate(32 32) scale(.9) translate(-32 -31.5)">
+    <path d="M10 28 L32 12 L54 28" stroke="#c4622d" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M17 50 V38 a4 4 0 0 1 8 0 V50" stroke="#f7f2e9" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M28 50 V36 a4 4 0 0 1 8 0 V50" stroke="#e8a93b" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M39 50 V38 a4 4 0 0 1 8 0 V50" stroke="#f7f2e9" stroke-width="3.2" stroke-linecap="round"/>
+    <path d="M13 51 H51" stroke="#f7f2e9" stroke-width="3.2" stroke-linecap="round"/>
+  </g>
+</svg>

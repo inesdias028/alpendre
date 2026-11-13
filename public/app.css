@@ -273,3 +273,20 @@ details ol { padding-left: 1.2rem; margin: .5rem 0 0; line-height: 1.55; }
 .login-card .help { text-align: left; }
 .owner-tag { display: inline-block; font-size: .72rem; font-weight: 600; padding: .05rem .45rem; border-radius: 6px; background: #efe9df; color: var(--ink-2); }
 .full-span { grid-column: 1 / -1; }
+
+/* ---------- home-screen app (iPhone notch, status bar, home bar) ---------- */
+html { -webkit-text-size-adjust: 100%; background: var(--ink); }
+body { -webkit-tap-highlight-color: transparent; min-height: 100vh; background: var(--cream); }
+.login { padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+.side { padding-top: calc(1.25rem + env(safe-area-inset-top)); padding-bottom: calc(1.25rem + env(safe-area-inset-bottom)); padding-left: max(1rem, env(safe-area-inset-left)); }
+.main { padding-bottom: calc(3rem + env(safe-area-inset-bottom)); padding-right: max(2rem, env(safe-area-inset-right)); }
+.drawer header { padding-top: calc(1.25rem + env(safe-area-inset-top)); }
+.drawer footer { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+.drawer { padding-right: env(safe-area-inset-right); }
+.toast { bottom: calc(24px + env(safe-area-inset-bottom)); max-width: calc(100vw - 32px); text-align: center; }
+@media (max-width: 760px) {
+  .side { padding: calc(.6rem + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) .6rem max(16px, env(safe-area-inset-left)); }
+  .main { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+  /* 16px stops iPhone from zooming in when a field is tapped */
+  input, select, textarea, .field input, .field select, .field textarea, .filters input, .filters select { font-size: 16px; }
+}
