@@ -397,3 +397,19 @@ body { -webkit-tap-highlight-color: transparent; min-height: 100vh; background: 
   .drawer.is-sheet { height: auto; max-height: 85dvh; border-radius: 18px 18px 0 0; }
   .drawer.is-sheet .body { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
 }
+
+/* ===================== phone layout, round 2 ===================== */
+@media (max-width: 760px) {
+  .tabbar a span, .tabbar button span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px; }
+  .tb-badge.static { position: static; margin-left: .2rem; }
+  .sheet-label { margin: .6rem .2rem 0; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: .45rem; }
+  .sheet-label:first-child { margin-top: 0; }
+  .sheet-item svg { flex: none; color: var(--ink-2); }
+  .sheet-item.danger svg { color: var(--danger); }
+  /* calendar: stays readable and big enough to tap, with the colour key back */
+  .cal-head .legend { display: flex; flex: 1 0 100%; order: 5; gap: .3rem; }
+  .cal-head .legend .chip { font-size: .68rem; padding: .1rem .45rem; }
+  .week { min-height: 64px; }
+  .cal .bar { font-size: .62rem; height: 18px; line-height: 18px; padding: 0 4px; margin: 2px 1px; color: #fff; font-weight: 600; text-overflow: clip; }
+  .cal .bar.pending { opacity: .6; }
+}

@@ -128,7 +128,7 @@ function render() {
     const w = houseById(r.hid);
     crumb = `<a href="#/">All houses</a> / <span class="dot" style="background:${w.color}"></span>${esc(w.name)}`;
     title = r.view === 'overview' ? esc(w.name) : HOUSE_VIEWS[r.view];
-    sub = { overview: esc(w.location || ''), calendar: 'Every channel on one calendar. Click a stay to open it, or a day to add one.',
+    sub = { overview: esc(w.location || ''), calendar: `Every channel on one calendar. ${matchMedia('(pointer: coarse)').matches ? 'Tap' : 'Click'} a stay to open it, or a day to add one.`,
       reservations: 'Stays from Airbnb, Booking.com, your website and manual entries.',
       channels: 'Connect Airbnb, Booking.com and your website so the calendars stay in sync.',
       settings: 'Details and the rules your website uses to take bookings.' }[r.view];
@@ -166,10 +166,17 @@ const ICON = {
   bookings: '<path d="M4 6h16M4 12h16M4 18h10"/>',
   links: '<path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/>',
   more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+  houses: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  out: '<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H3"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
   sync: '<path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/>',
   down: '<path d="M6 9l6 6 6-6"/>',
 };
 const svg = (k, s = 22) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}">${ICON[k]}</svg>`;
+const shortName = n => { const w = String(n).split(/\s+/); return (w[0].length > 3 || w.length === 1 ? w[0] : w.slice(0, 2).join(' ')).slice(0, 11); };
+function houseIssues(w) { return !!w && (live(w.id).some(x => x.conflicts.length) || CHANNELS.some(c => channelState(w, c) === 'err')); }
 function currentHouse() {
   let id = S.route.hid || S.lastHouse;
   if (!id) try { id = localStorage.getItem('alp_house'); } catch { /* ignore */ }
@@ -184,11 +191,12 @@ function renderPhoneBars() {
   const tab = (href, icon, label, on, badge = 0, off = false) => off ? `<span class="off">${svg(icon)}<span>${label}</span></span>`
     : `<a href="${href}" class="${on ? 'active' : ''}">${svg(icon)}<span>${label}</span>${badge ? `<b class="tb-badge">${badge}</b>` : ''}</a>`;
   const h = cur ? `#/h/${cur.id}` : '#/', none = !cur, v = r.name === 'house' ? r.view : '';
-  $('#tabbar').innerHTML = tab('#/', 'home', 'Home', r.name === 'home' || v === 'overview')
+  const allPending = live().filter(x => x.status === 'pending').length;
+  $('#tabbar').innerHTML = tab('#/', 'houses', 'All houses', r.name === 'home', allPending)
+    + tab(h + '/overview', 'home', cur ? shortName(cur.name) : 'House', v === 'overview', houseIssues(cur) ? '!' : 0, none)
     + tab(h + '/calendar', 'calendar', 'Calendar', v === 'calendar', 0, none)
     + tab(h + '/reservations', 'bookings', 'Bookings', v === 'reservations', pending, none)
-    + tab(h + '/channels', 'links', 'Connections', v === 'channels', 0, none)
-    + `<button type="button" id="moreBtn" class="${r.name === 'settings' || v === 'settings' ? 'active' : ''}">${svg('more')}<span>More</span></button>`;
+    + `<button type="button" id="moreBtn" class="${r.name === 'settings' || v === 'settings' || v === 'channels' ? 'active' : ''}">${svg('more')}<span>More</span></button>`;
   $('#fab').hidden = r.name === 'settings' || v === 'settings' || v === 'channels' || !houses().length;
   $('#ctxBtn').onclick = openHouseSwitcher;
   $('#abSync').onclick = () => doSync(r.name === 'house' ? r.hid : null);
@@ -205,20 +213,28 @@ function openHouseSwitcher() {
   const cur = S.route.name === 'house' ? S.route.hid : null;
   sheet('Choose a house', [
     `<button class="sheet-item ${!cur ? 'on' : ''}" data-sheet-go="#/"><span class="dot" style="background:var(--ink)"></span>All houses</button>`,
-    ...houses().map(w => `<button class="sheet-item ${cur === w.id ? 'on' : ''}" data-sheet-go="#/h/${w.id}/${S.route.view && S.route.name === 'house' ? S.route.view : 'overview'}"><span class="dot" style="background:${w.color}"></span><span>${esc(w.name)}<small>${esc(w.location || '')}</small></span></button>`),
+    ...houses().map(w => { const p = live(w.id).filter(x => x.status === 'pending').length;
+      return `<button class="sheet-item ${cur === w.id ? 'on' : ''}" data-sheet-go="#/h/${w.id}/${S.route.view && S.route.name === 'house' ? S.route.view : 'overview'}"><span class="dot" style="background:${w.color}"></span>
+        <span style="flex:1">${esc(w.name)}<small>${esc(w.location || '')}${othersExist() ? ' · ' + esc(w.ownerName) : ''}</small></span>
+        ${houseIssues(w) ? '<span class="warn-dot" title="Needs attention">⚠</span>' : ''}${p ? `<b class="tb-badge static">${p}</b>` : ''}</button>`; }),
     `<button class="sheet-item add" id="sheetAdd">+ Add a house</button>`,
   ]);
   $('#sheetAdd').onclick = () => { closeDrawer(); openHouseDrawer(); };
 }
 function openMoreSheet() {
   const c = currentHouse();
+  const errs = c ? CHANNELS.filter(ch => channelState(c, ch) === 'err').length : 0;
   sheet('More', [
-    c ? `<button class="sheet-item" data-sheet-go="#/h/${c.id}/settings"><span class="dot" style="background:${c.color}"></span>House settings · ${esc(c.name)}</button>` : '',
-    `<button class="sheet-item" data-sheet-go="#/settings">${isOwner() ? 'Settings, people &amp; emails' : 'My account'}</button>`,
-    `<button class="sheet-item" id="sheetAdd">+ Add a house</button>`,
-    `<p class="help" style="margin:.8rem .2rem .2rem">${S.state.me ? 'Signed in as <b>' + esc(S.state.me.name) + '</b>' : ''}</p>`,
-    `<button class="sheet-item danger" id="sheetOut">Sign out</button>`,
+    c ? `<p class="sheet-label"><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</p>` : '',
+    c ? `<button class="sheet-item" data-sheet-go="#/h/${c.id}/channels">${svg('links', 20)}<span style="flex:1">Connections<small>Airbnb, Booking.com and website</small></span>${errs ? '<span class="warn-dot">⚠</span>' : ''}</button>` : '',
+    c ? `<button class="sheet-item" data-sheet-go="#/h/${c.id}/settings">${svg('gear', 20)}<span>House settings<small>Details, booking rules, confirmation email</small></span></button>` : '',
+    c && houses().length > 1 ? `<button class="sheet-item" id="sheetSwitch">${svg('houses', 20)}<span>Switch house</span></button>` : '',
+    `<p class="sheet-label">Alpendre</p>`,
+    `<button class="sheet-item" data-sheet-go="#/settings">${svg('user', 20)}<span>${isOwner() ? 'Settings<small>People, guest emails, calendar sync</small>' : 'My account<small>Change my password</small>'}</span></button>`,
+    `<button class="sheet-item" id="sheetAdd">${svg('plus', 20)}<span>Add a house</span></button>`,
+    `<button class="sheet-item danger" id="sheetOut">${svg('out', 20)}<span>Sign out<small>${S.state.me ? 'Signed in as ' + esc(S.state.me.name) : ''}</small></span></button>`,
   ]);
+  const sw = $('#sheetSwitch'); if (sw) sw.onclick = openHouseSwitcher;
   $('#sheetAdd').onclick = () => { closeDrawer(); openHouseDrawer(); };
   $('#sheetOut').onclick = () => { closeDrawer(); $('#logout').click(); };
 }
@@ -307,7 +323,7 @@ function agenda(list, w, empty = 'No stays this month.') {
   return `<div class="agenda">${list.map(r => `<button class="ag-item ${r.source}" data-open="${r.id}">
       <div class="ag-dates"><b>${D(r.checkIn).getUTCDate()}</b><span>${MONTHS[D(r.checkIn).getUTCMonth()]}</span></div>
       <div class="ag-main"><div class="ag-name">${r.guestName ? esc(r.guestName) : `<span class="missing">${SOURCES[r.source]} guest</span>`}${r.conflicts.length ? ' <span class="warn-dot">⚠</span>' : ''}</div>
-        <div class="ag-sub">${range(r)} · ${nightsOf(r.checkIn, r.checkOut)} nights${r.guests ? ` · ${r.guests} guests` : ''}</div>
+        <div class="ag-sub">${range(r)} · ${nightsOf(r.checkIn, r.checkOut)} nights${r.guests ? ` · ${r.guests} guests` : ''}${r.code ? ` · ${esc(r.code)}` : ''}</div>
         <div class="ag-tags"><span class="chip ${r.source}">${SOURCES[r.source]}</span><span class="status ${r.status}">${r.status}</span></div></div>
       <div class="ag-price">${r.price ? money(r.price, w.currency) : ''}</div>
     </button>`).join('')}</div>`;
