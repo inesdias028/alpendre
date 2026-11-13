@@ -468,7 +468,7 @@ function viewSettings() {
     <button class="btn" id="changePw">Change my password</button></div>`;
   return peopleCard() + `<div class="grid two">
     <div class="card"><h2>Calendar sync</h2>
-      <label class="field">Check every connected calendar every<select id="syncMinutes">${[15, 30, 60, 180].map(m => `<option value="${m}" ${s.syncMinutes == m ? 'selected' : ''}>${m < 60 ? m + ' minutes' : m / 60 + ' hour' + (m > 60 ? 's' : '')}</option>`).join('')}</select></label>
+      <label class="field">Check every connected calendar every<select id="syncMinutes">${[5, 15, 30, 60, 180].map(m => `<option value="${m}" ${s.syncMinutes == m ? 'selected' : ''}>${m < 60 ? m + ' minutes' : m / 60 + ' hour' + (m > 60 ? 's' : '')}</option>`).join('')}</select></label>
       <div style="margin-top:1rem"><button class="btn primary" id="saveSettings">Save</button></div></div>
     <div class="card"><h2>Housekeeping</h2>
       ${houses().some(w => w.demo) ? '<p class="help" style="margin:0 0 .8rem">Demo houses are loaded so you can look around. Remove them before adding your own.</p><button class="btn danger" id="clearDemo">Remove demo houses</button>' : '<p class="help" style="margin:0">No demo data left.</p>'}

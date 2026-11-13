@@ -15,9 +15,9 @@ class_name = "Alpendre"
 tag = "v1"
 new_sqlite_classes = ["Alpendre"]
 
-# Checks every 15 minutes; the house-wide "sync every N minutes" setting decides when to actually sync.
+# Wakes every 5 minutes; the "check every N minutes" setting decides when to actually sync.
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["*/5 * * * *"]
 
 [vars]
 # Sites allowed to call the owner API from the browser (the GitHub Pages dashboard).

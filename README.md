@@ -19,7 +19,7 @@
 - **Dashboard:** https://inesdias028.github.io/alpendre/ (GitHub Pages)
 - **API, calendar links and widget:** https://alpendre.houseguests.workers.dev (Cloudflare Worker)
 
-GitHub Pages only hosts static files, so the server part runs on Cloudflare Workers (free plan). A Durable Object stores all houses and reservations, and a scheduled trigger syncs the calendars every 15 minutes (the sync interval in Settings decides how often a sync actually happens).
+GitHub Pages only hosts static files, so the server part runs on Cloudflare Workers (free plan). A Durable Object stores all houses and reservations, and a scheduled trigger checks the calendars every 5 minutes (Settings can make it less often).
 
 ## Run it locally
 

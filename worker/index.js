@@ -127,7 +127,7 @@ export class Alpendre extends DurableObject {
   // ---------- storage ----------
   async load() {
     const all = await this.ctx.storage.list();
-    this.db = { settings: { syncMinutes: 30, lastAutoSync: null }, workspaces: [], reservations: [], log: [], users: [] };
+    this.db = { settings: { syncMinutes: 5, lastAutoSync: null }, workspaces: [], reservations: [], log: [], users: [] };
     for (const [k, v] of all) {
       if (k === 'settings') this.db.settings = { ...this.db.settings, ...v };
       else if (k === 'log') this.db.log = v;
@@ -136,6 +136,8 @@ export class Alpendre extends DurableObject {
       else if (k.startsWith('u:')) this.db.users.push(v);
     }
     this.db.users.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    // One-off: move existing setups to the 5-minute check (they can still pick a slower one).
+    if (!this.db.settings.fiveMinuteDefault) { this.db.settings.syncMinutes = 5; this.db.settings.fiveMinuteDefault = true; this.touch('settings'); }
     // Houses from before ownership existed: give each to whoever the log says created it.
     for (const w of this.db.workspaces) {
       if (w.ownerId) continue;
@@ -347,7 +349,7 @@ export class Alpendre extends DurableObject {
   async fetch(req) {
     const url = new URL(req.url), p = url.pathname, m = req.method;
     if (p === '/__cron') {
-      const mins = Math.max(15, this.db.settings.syncMinutes || 30);
+      const mins = Math.max(5, this.db.settings.syncMinutes || 5);
       const last = this.db.settings.lastAutoSync ? Date.parse(this.db.settings.lastAutoSync) : 0;
       if (Date.now() - last < (mins - 1) * 60e3) return json({ skipped: true });
       this.db.settings.lastAutoSync = new Date().toISOString(); this.touch('settings');
@@ -570,7 +572,7 @@ export class Alpendre extends DurableObject {
     if (p === '/api/settings' && m === 'PUT') {
       if (!this.isOwner()) return ownerOnly();
       const b = await readBody(req);
-      if ([15, 30, 60, 180].includes(+b.syncMinutes)) { db.settings.syncMinutes = +b.syncMinutes; this.touch('settings'); }
+      if ([5, 15, 30, 60, 180].includes(+b.syncMinutes)) { db.settings.syncMinutes = +b.syncMinutes; this.touch('settings'); }
       await this.save(); return json(db.settings, 200, cors);
     }
     if (p === '/api/demo' && m === 'DELETE') {
