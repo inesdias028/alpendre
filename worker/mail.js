@@ -39,6 +39,8 @@ const TEXT = {
   },
 };
 
+const LOGO_W = 170; // px wide in the email
+
 export function confirmationEmail(house, r) {
   const L = TEXT[guestLang(r)];
   const day = s => D(s).toLocaleDateString(L.locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
@@ -59,7 +61,8 @@ export function confirmationEmail(house, r) {
   const html = `<!doctype html><html><body style="margin:0;background:#f7f2e9;font-family:Georgia,'Times New Roman',serif;color:#1f2a24">
 <div style="max-width:560px;margin:0 auto;padding:28px 18px">
   <div style="background:#fffdf9;border:1px solid #e6dfd2;border-radius:16px;padding:28px 26px">
-    <p style="margin:0 0 6px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#c4622d;font-family:Arial,sans-serif">${esc(house.name)}</p>
+    ${/^https:\/\//i.test(house.emailLogo || '') ? `<div style="text-align:center;margin:0 0 22px"><img src="${esc(house.emailLogo)}" alt="${esc(house.name)}" width="${LOGO_W}" style="display:inline-block;width:${LOGO_W}px;max-width:70%;height:auto;border:0"></div>`
+      : `<p style="margin:0 0 6px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#c4622d;font-family:Arial,sans-serif">${esc(house.name)}</p>`}
     <h1 style="margin:0 0 18px;font-size:24px;font-weight:600">${esc(L.hello(first))}</h1>
     <p style="margin:0 0 20px;font-size:16px;line-height:1.55">${esc(L.intro(house.name))}</p>
     <table role="presentation" style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px">

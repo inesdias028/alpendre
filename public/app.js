@@ -533,6 +533,9 @@ function houseForm(w, isNew) {
     </div>${isNew ? '' : '<div style="margin-top:1rem"><button class="btn primary" type="submit">Save changes</button></div>'}</div>
     ${isNew ? '' : `<div class="card full-span"><h2>Confirmation email</h2>
       <p class="help" style="margin:0 0 .8rem">When you confirm a booking, the guest gets an email${S.state.mailFrom ? ` from <b>${esc(S.state.mailFrom)}</b>` : ''} in their language (Portuguese or English) with the dates, check-in and check-out times, guests, total and reference.</p>
+      <label class="field" style="margin-bottom:.9rem">Logo in emails (optional)<input name="emailLogo" type="url" inputmode="url" placeholder="https://…/logo.png" value="${esc(w.emailLogo || '')}">
+      <span class="help">A link to an image (PNG or JPG). Shown at the top of the confirmation email.</span></label>
+      <div class="logo-preview" id="logoPreview">${w.emailLogo ? `<img src="${esc(w.emailLogo)}" alt="">` : ''}</div>
       <label class="field">Extra message (optional)<textarea name="confirmMessage" rows="5" maxlength="3000" placeholder="e.g. how to pay the 30% deposit, the address and how to get there, who to call on arrival">${esc(w.confirmMessage || '')}</textarea>
       <span class="help">Added to every confirmation email for this house, exactly as written.</span></label>
       <div style="margin-top:1rem"><button class="btn primary" type="submit">Save changes</button></div></div>`}
@@ -624,6 +627,8 @@ const AFTER = {
   settings() {
     if (S.route.name === 'house') {
       const hid = S.route.hid;
+      const lg = $('#houseForm [name=emailLogo]'), pv = $('#logoPreview');
+      if (lg) lg.oninput = () => { const u = lg.value.trim(); pv.innerHTML = /^https:\/\/\S+$/i.test(u) ? `<img src="${esc(u)}" alt="" onerror="this.parentNode.innerHTML='<span class=help>That link doesn’t show an image.</span>'">` : ''; };
       $('#houseForm').onsubmit = async e => { e.preventDefault(); try { await api(`/api/workspaces/${hid}`, { method: 'PUT', body: readHouseForm() }); toast('Saved'); await refresh(); } catch (err) { toast(err.message); } };
       $('#delHouse').onclick = async () => {
         const w = houseById(hid);

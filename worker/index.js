@@ -296,6 +296,11 @@ export class Alpendre extends DurableObject {
   updateHouse(w, b) {
     for (const k of HOUSE_TEXT) if (typeof b[k] === 'string') w[k] = b[k].trim().slice(0, 200);
     if (typeof b.confirmMessage === 'string') w.confirmMessage = b.confirmMessage.trim().slice(0, 3000);
+    if (typeof b.emailLogo === 'string') {
+      const u = b.emailLogo.trim();
+      if (u && !/^https:\/\/[^\s"'<>]+$/i.test(u)) throw new Error('The logo link must start with https://');
+      w.emailLogo = u.slice(0, 500);
+    }
     if (!w.name) w.name = 'Untitled house';
     if (typeof b.color === 'string' && /^#[0-9a-f]{6}$/i.test(b.color)) w.color = b.color;
     for (const k of HOUSE_NUM) if (b[k] !== undefined && b[k] !== '' && !isNaN(+b[k])) w[k] = Math.max(k === 'minNights' || k === 'maxGuests' ? 1 : 0, +b[k]);
