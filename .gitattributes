@@ -1,0 +1,2 @@
+# The mail library builds SMTP messages from template strings: keep its line endings exactly.
+worker/vendor/*.mjs -text
