@@ -2,7 +2,7 @@
 // The Worker routes every request to the Durable Object, which keeps the data in
 // memory, persists changes to its storage and runs the calendar syncs.
 import { DurableObject } from 'cloudflare:workers';
-import { mailReady, confirmationEmail, sendMail } from './mail.js';
+import { mailReady, emailParts, sendMail } from './mail.js';
 
 const CHANNELS = ['airbnb', 'booking', 'website'];
 const SOURCES = ['airbnb', 'booking', 'website', 'manual'];
@@ -319,7 +319,7 @@ export class Alpendre extends DurableObject {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email || '')) return { emailSent: false, emailError: 'This reservation has no guest email.' };
     if (!mailReady(this.env)) return { emailSent: false, emailError: 'Email is not set up yet.' };
     try {
-      const m = confirmationEmail(w, r);
+      const m = await emailParts(w, r);
       await sendMail(this.env, { fromName: w.name, to: r.email, toName: r.guestName, ...m });
       r.confirmationSentAt = new Date().toISOString(); this.touchR(r);
       this.log(w.id, `Confirmation email sent to ${r.guestName || r.email}`);

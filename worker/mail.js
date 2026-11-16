@@ -1,6 +1,7 @@
 // Guest emails, sent through Gmail's SMTP server with an app password.
 // GMAIL_USER (wrangler.toml) is the sending address; GMAIL_APP_PASSWORD is a Worker secret.
-import { WorkerMailer } from 'worker-mailer';
+// Local copy of worker-mailer with embedded-image support (see vendor/worker-mailer.mjs).
+import { WorkerMailer } from './vendor/worker-mailer.mjs';
 
 export const mailReady = env => !!(env.GMAIL_USER && env.GMAIL_APP_PASSWORD);
 
@@ -40,8 +41,38 @@ const TEXT = {
 };
 
 const LOGO_W = 170; // px wide in the email
+const LOGO_CID = 'house-logo@alpendre';
 
-export function confirmationEmail(house, r) {
+// The logo travels inside the email (cid:) so it shows without "load images"; if it cannot be
+// fetched, the email falls back to linking it from the web.
+const logoCache = new Map();
+async function fetchLogo(url) {
+  const hit = logoCache.get(url);
+  if (hit && Date.now() - hit.at < 36e5) return hit;
+  const res = await fetch(url, { headers: { 'User-Agent': 'Alpendre-Mail/1.0' } });
+  if (!res.ok) throw new Error(`logo HTTP ${res.status}`);
+  const type = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  if (!/^image\/(png|jpeg|gif)$/.test(type)) throw new Error(`logo is ${type || 'not an image'}`);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes.length > 400e3) throw new Error('logo is larger than 400 KB');
+  let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const out = { at: Date.now(), type, ext: type.split('/')[1].replace('jpeg', 'jpg'), b64: btoa(bin) };
+  logoCache.set(url, out);
+  return out;
+}
+export async function emailParts(house, r) {
+  let logoSrc = '', inline = [];
+  if (/^https:\/\//i.test(house.emailLogo || '')) {
+    try {
+      const l = await fetchLogo(house.emailLogo);
+      logoSrc = 'cid:' + LOGO_CID;
+      inline = [{ cid: LOGO_CID, filename: 'logo.' + l.ext, mimeType: l.type, content: l.b64 }];
+    } catch { logoSrc = house.emailLogo; }
+  }
+  return { ...confirmationEmail(house, r, logoSrc), inline };
+}
+
+export function confirmationEmail(house, r, logoSrc = '') {
   const L = TEXT[guestLang(r)];
   const day = s => D(s).toLocaleDateString(L.locale, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
   const short = s => D(s).toLocaleDateString(L.locale, { day: 'numeric', month: 'long', timeZone: 'UTC' });
@@ -61,7 +92,7 @@ export function confirmationEmail(house, r) {
   const html = `<!doctype html><html><body style="margin:0;background:#f7f2e9;font-family:Georgia,'Times New Roman',serif;color:#1f2a24">
 <div style="max-width:560px;margin:0 auto;padding:28px 18px">
   <div style="background:#fffdf9;border:1px solid #e6dfd2;border-radius:16px;padding:28px 26px">
-    ${/^https:\/\//i.test(house.emailLogo || '') ? `<div style="text-align:center;margin:0 0 22px"><img src="${esc(house.emailLogo)}" alt="${esc(house.name)}" width="${LOGO_W}" style="display:inline-block;width:${LOGO_W}px;max-width:70%;height:auto;border:0"></div>`
+    ${logoSrc ? `<div style="text-align:center;margin:0 0 22px"><img src="${esc(logoSrc)}" alt="${esc(house.name)}" width="${LOGO_W}" style="display:inline-block;width:${LOGO_W}px;max-width:70%;height:auto;border:0"></div>`
       : `<p style="margin:0 0 6px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#c4622d;font-family:Arial,sans-serif">${esc(house.name)}</p>`}
     <h1 style="margin:0 0 18px;font-size:24px;font-weight:600">${esc(L.hello(first))}</h1>
     <p style="margin:0 0 20px;font-size:16px;line-height:1.55">${esc(L.intro(house.name))}</p>
@@ -76,7 +107,7 @@ export function confirmationEmail(house, r) {
   return { subject: L.subject(house.name, short(r.checkIn), short(r.checkOut)), text, html };
 }
 
-export async function sendMail(env, { fromName, to, toName, subject, text, html }) {
+export async function sendMail(env, { fromName, to, toName, subject, text, html, inline }) {
   if (!mailReady(env)) throw new Error('Email is not set up yet (missing Gmail app password).');
   const mailer = await WorkerMailer.connect({
     host: 'smtp.gmail.com', port: 465, secure: true,
@@ -84,6 +115,6 @@ export async function sendMail(env, { fromName, to, toName, subject, text, html 
     authType: 'plain', socketTimeoutMs: 15000, responseTimeoutMs: 15000,
   });
   try {
-    await mailer.send({ from: { name: fromName, email: env.GMAIL_USER }, to: { name: toName || to, email: to }, subject, text, html });
+    await mailer.send({ from: { name: fromName, email: env.GMAIL_USER }, to: { name: toName || to, email: to }, subject, text, html, inline });
   } finally { try { await mailer.close(); } catch { /* already closed */ } }
 }
