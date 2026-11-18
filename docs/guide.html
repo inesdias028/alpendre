@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Alpendre: the complete guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=block" rel="stylesheet">
+<style>
+  :root { --ink:#1f2a24; --ink2:#4a564f; --muted:#7d867f; --line:#e6dfd2; --cream:#f7f2e9; --paper:#fffdf9;
+    --terra:#c4622d; --terra-soft:#f6e2d6; --olive:#6b7f4e; --olive-soft:#e7ecdc; --sun:#e8a93b; --airbnb:#e0565b; --booking:#1d4f91; }
+  @page { size: A4; margin: 18mm 17mm 20mm; @bottom-left { content: "Alpendre · the complete guide"; font: 8pt Inter, sans-serif; color: #9a9385; }
+    @bottom-right { content: counter(page); font: 8pt Inter, sans-serif; color: #9a9385; } }
+  @page :first { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; font-family: Inter, system-ui, sans-serif; font-size: 9.3pt; line-height: 1.5; color: var(--ink); }
+  h1, h2, h3 { font-family: Fraunces, Georgia, serif; font-weight: 600; letter-spacing: -.01em; margin: 0; }
+  h2 { font-size: 21pt; margin: 0 0 4mm; break-after: avoid; }
+  h2 .n { color: var(--terra); margin-right: 3mm; }
+  h3 { font-size: 12.5pt; margin: 5mm 0 1.8mm; break-after: avoid; }
+  p { margin: 0 0 2.6mm; }
+  .lead { font-size: 10.6pt; color: var(--ink2); margin-bottom: 4mm; }
+  section { break-before: page; }
+  section.flow { break-before: auto; margin-top: 8mm; }
+  ul, ol { margin: 0 0 3mm; padding-left: 5mm; }
+  li { margin: 0 0 .9mm; }
+  code, .mono { font-family: "Cascadia Mono", Consolas, monospace; font-size: 8.6pt; background: var(--cream); padding: .2mm 1.2mm; border-radius: 1mm; }
+  pre { font-family: "Cascadia Mono", Consolas, monospace; font-size: 8.4pt; background: var(--ink); color: #f1ece2; padding: 3mm 4mm; border-radius: 2mm; margin: 0 0 3mm; white-space: pre-wrap; break-inside: avoid; }
+  pre .c { color: #a9b3a2; }
+  table { width: 100%; border-collapse: collapse; margin: 0 0 4mm; font-size: 9pt; break-inside: auto; }
+  th { text-align: left; font-size: 7.6pt; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; padding: 2mm 2.5mm; background: var(--cream); border-bottom: .3mm solid var(--line); }
+  td { padding: 1.6mm 2.5mm; border-bottom: .3mm solid var(--line); vertical-align: top; }
+  tr { break-inside: avoid; }
+  td:first-child { font-weight: 600; width: 30%; }
+  .box { border: .3mm solid var(--line); background: var(--paper); border-radius: 3mm; padding: 3mm 4mm; margin: 0 0 3.5mm; break-inside: avoid; }
+  .box.tip { background: var(--olive-soft); border-color: #cfd8bd; }
+  .box.warn { background: #fdf0e0; border-color: #f0d6b0; }
+  .box.key { background: var(--terra-soft); border-color: #eccab4; }
+  .box h4 { margin: 0 0 1.5mm; font-size: 9.6pt; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3.5mm; }
+  .tag { display: inline-block; font-size: 7.4pt; font-weight: 600; padding: .3mm 2mm; border-radius: 10mm; background: var(--cream); color: var(--ink2); }
+  .tag.airbnb { background: #fbe3e3; color: #b8383d; } .tag.booking { background: #dfe8f5; color: var(--booking); }
+  .tag.web { background: var(--terra-soft); color: #a24e20; } .tag.manual { background: var(--olive-soft); color: #4d5c37; }
+  .kv { display: grid; grid-template-columns: 34mm 1fr; gap: 1.6mm 4mm; margin: 0 0 4mm; }
+  .kv b { color: var(--ink2); font-weight: 600; }
+  a { color: #a24e20; text-decoration: none; }
+
+  /* cover */
+  .cover { height: 297mm; background: var(--ink); color: #f1ece2; padding: 32mm 22mm 22mm; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+  .cover .mark { width: 34mm; height: 34mm; }
+  .cover h1 { font-size: 46pt; color: #fff; margin: 12mm 0 3mm; line-height: 1; }
+  .cover .tagline { font-family: Fraunces, serif; font-size: 16pt; color: var(--sun); margin: 0 0 14mm; }
+  .cover .what { font-size: 12pt; color: #d9d4c9; max-width: 135mm; line-height: 1.55; }
+  .cover .meta { margin-top: auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5mm; font-size: 8.8pt; color: #c9c4b8; border-top: .3mm solid rgba(255,255,255,.15); padding-top: 6mm; }
+  .cover .meta b { display: block; color: #fff; font-size: 9.4pt; margin-bottom: 1mm; }
+  .cover .arches { position: absolute; right: -18mm; bottom: 58mm; width: 120mm; opacity: .08; }
+
+  /* contents */
+  .toc { columns: 2; column-gap: 10mm; margin-top: 2mm; }
+  .toc div { break-inside: avoid; display: flex; gap: 3mm; padding: 1.5mm 0; border-bottom: .3mm solid var(--line); font-size: 10pt; }
+  .toc .n { color: var(--terra); font-family: Fraunces, serif; font-weight: 700; width: 7mm; }
+
+  /* timeline */
+  .tl { border-left: .6mm solid var(--line); margin-left: 3mm; padding-left: 6mm; }
+  .tl .step { position: relative; margin: 0 0 4.5mm; break-inside: avoid; }
+  .tl .step::before { content: ''; position: absolute; left: -8.1mm; top: 1mm; width: 3.6mm; height: 3.6mm; border-radius: 50%; background: var(--terra); border: .8mm solid #fff; box-shadow: 0 0 0 .3mm var(--terra); }
+  .tl .step h4 { margin: 0 0 1mm; font-size: 10.4pt; font-family: Fraunces, serif; }
+  .tl .step .why { color: var(--ink2); }
+  .tl .step .date { font-size: 7.6pt; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .diagram { width: 100%; margin: 2mm 0 5mm; }
+</style>
+</head>
+<body>
+
+<!-- ===================== COVER ===================== -->
+<div class="cover">
+  <svg class="mark" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="16" fill="#2b3a32"/><path d="M10 28 L32 12 L54 28" stroke="#c4622d" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 50 V38 a4 4 0 0 1 8 0 V50" stroke="#f7f2e9" stroke-width="3.2" stroke-linecap="round"/><path d="M28 50 V36 a4 4 0 0 1 8 0 V50" stroke="#e8a93b" stroke-width="3.2" stroke-linecap="round"/><path d="M39 50 V38 a4 4 0 0 1 8 0 V50" stroke="#f7f2e9" stroke-width="3.2" stroke-linecap="round"/><path d="M13 51 H51" stroke="#f7f2e9" stroke-width="3.2" stroke-linecap="round"/></svg>
+  <h1>Alpendre</h1>
+  <p class="tagline">Every booking, one porch.</p>
+  <p class="what">The complete guide: how the app was made, how every part works, where everything lives, and how to run, update and fix it. <i>Alpendre</i> is Portuguese for porch, the place where every guest arrives, whatever road they took.</p>
+  <svg class="arches" viewBox="0 0 64 64" fill="none"><path d="M10 28 L32 12 L54 28" stroke="#fff" stroke-width="3"/><path d="M17 50 V38 a4 4 0 0 1 8 0 V50 M28 50 V36 a4 4 0 0 1 8 0 V50 M39 50 V38 a4 4 0 0 1 8 0 V50 M13 51 H51" stroke="#fff" stroke-width="2"/></svg>
+  <div class="meta">
+    <div><b>Dashboard</b>inesdias028.github.io/alpendre</div>
+    <div><b>Server</b>alpendre.houseguests.workers.dev</div>
+    <div><b>Version of this guide</b>16 November 2026</div>
+  </div>
+</div>
+
+<!-- ===================== CONTENTS ===================== -->
+<section style="break-before: page">
+  <h2>Contents</h2>
+  <div class="toc">
+    <div><span class="n">1</span>Alpendre at a glance</div>
+    <div><span class="n">2</span>How the pieces fit together</div>
+    <div><span class="n">3</span>How it was made, step by step</div>
+    <div><span class="n">4</span>Using the app: every feature</div>
+    <div><span class="n">5</span>Calendar sync with Airbnb and Booking.com</div>
+    <div><span class="n">6</span>The Quinta do Cabeço website connection</div>
+    <div><span class="n">7</span>People, access and security</div>
+    <div><span class="n">8</span>Confirmation emails</div>
+    <div><span class="n">9</span>The iPhone app</div>
+    <div><span class="n">10</span>Running and updating the app</div>
+    <div><span class="n">11</span>Costs and limits</div>
+    <div><span class="n">12</span>Troubleshooting</div>
+    <div><span class="n">13</span>Ideas for later</div>
+    <div><span class="n">A</span>Quick reference card</div>
+  </div>
+
+  <section class="flow">
+    <h2><span class="n">1</span>Alpendre at a glance</h2>
+    <p class="lead">Alpendre is a private platform for managing several holiday houses. Each house is a <b>workspace</b> with its own calendar, reservations and connections to <b>Airbnb</b>, <b>Booking.com</b> and its <b>own website</b>, so a night sold anywhere is blocked everywhere.</p>
+    <div class="grid3">
+      <div class="box"><h4>One calendar</h4>Stays from every channel on one calendar per house, plus a timeline of all houses side by side. Double bookings are flagged in red.</div>
+      <div class="box"><h4>Direct bookings</h4>The house website shows live availability and sends booking requests straight into Alpendre, with no commission.</div>
+      <div class="box"><h4>Team and email</h4>Personal accounts by invite, each person sees only their own houses, and guests get a confirmation email in their language.</div>
+    </div>
+    <h3>Where everything lives</h3>
+    <table>
+      <tr><th>What</th><th>Where</th></tr>
+      <tr><td>The dashboard</td><td><a>https://inesdias028.github.io/alpendre/</a> (also the iPhone app)</td></tr>
+      <tr><td>The server (API, sync, emails)</td><td><a>https://alpendre.houseguests.workers.dev</a> on Cloudflare Workers</td></tr>
+      <tr><td>Code: the app</td><td>GitHub repository <span class="mono">inesdias028/alpendre</span>. On this computer: <span class="mono">C:\Users\inesm\workspace\alpendre</span></td></tr>
+      <tr><td>Code: the house website</td><td>GitHub <span class="mono">qtcabecoavocados/quintadocabeco</span>, next to the app folder</td></tr>
+      <tr><td>Data (houses, stays, people)</td><td>Inside Cloudflare (a Durable Object), not in GitHub</td></tr>
+      <tr><td>Guest emails are sent from</td><td><span class="mono">cabecoreservations@gmail.com</span></td></tr>
+    </table>
+  </section>
+</section>
+
+<!-- ===================== 2 ARCHITECTURE ===================== -->
+<section>
+  <h2><span class="n">2</span>How the pieces fit together</h2>
+  <p class="lead">GitHub Pages can only host static pages, so Alpendre is split in two: the <b>dashboard</b> you look at (GitHub Pages) and the <b>server</b> that does the work (Cloudflare Workers).</p>
+  <svg class="diagram" viewBox="0 0 700 330" font-family="Inter, sans-serif" font-size="11">
+    <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#7d867f"/></marker></defs>
+    <!-- server -->
+    <rect x="250" y="105" width="200" height="120" rx="12" fill="#1f2a24"/>
+    <text x="350" y="132" text-anchor="middle" fill="#fff" font-family="Fraunces, serif" font-size="15" font-weight="600">Cloudflare Worker</text>
+    <text x="350" y="150" text-anchor="middle" fill="#c9c4b8">API · calendar sync every 5 min</text>
+    <text x="350" y="166" text-anchor="middle" fill="#c9c4b8">calendar links · emails</text>
+    <rect x="275" y="180" width="150" height="32" rx="7" fill="#2f3e36"/>
+    <text x="350" y="200" text-anchor="middle" fill="#e8a93b" font-weight="600">Durable Object (the data)</text>
+    <!-- dashboard -->
+    <rect x="250" y="12" width="200" height="56" rx="12" fill="#fffdf9" stroke="#e6dfd2"/>
+    <text x="350" y="36" text-anchor="middle" font-family="Fraunces, serif" font-size="14" font-weight="600" fill="#1f2a24">Dashboard</text>
+    <text x="350" y="54" text-anchor="middle" fill="#7d867f">GitHub Pages · computer and iPhone</text>
+    <line x1="350" y1="70" x2="350" y2="103" stroke="#7d867f" stroke-width="1.5" marker-end="url(#ar)" marker-start="url(#ar)"/>
+    <text x="358" y="91" fill="#7d867f" font-size="10">signed-in API</text>
+    <!-- airbnb / booking -->
+    <rect x="12" y="95" width="160" height="50" rx="10" fill="#fbe3e3"/><text x="92" y="125" text-anchor="middle" fill="#b8383d" font-weight="700" font-size="13">Airbnb</text>
+    <rect x="12" y="185" width="160" height="50" rx="10" fill="#dfe8f5"/><text x="92" y="215" text-anchor="middle" fill="#1d4f91" font-weight="700" font-size="13">Booking.com</text>
+    <line x1="174" y1="120" x2="248" y2="145" stroke="#7d867f" stroke-width="1.5" marker-end="url(#ar)" marker-start="url(#ar)"/>
+    <line x1="174" y1="210" x2="248" y2="185" stroke="#7d867f" stroke-width="1.5" marker-end="url(#ar)" marker-start="url(#ar)"/>
+    <text x="178" y="168" fill="#7d867f" font-size="10">iCal links,</text><text x="178" y="181" fill="#7d867f" font-size="10">both ways</text>
+    <!-- website -->
+    <rect x="528" y="95" width="160" height="62" rx="10" fill="#f6e2d6"/><text x="608" y="120" text-anchor="middle" fill="#a24e20" font-weight="700" font-size="13">House website</text><text x="608" y="138" text-anchor="middle" fill="#a24e20" font-size="10">Quinta do Cabeço</text>
+    <line x1="526" y1="128" x2="452" y2="150" stroke="#7d867f" stroke-width="1.5" marker-end="url(#ar)" marker-start="url(#ar)"/>
+    <text x="462" y="128" fill="#7d867f" font-size="10">availability +</text><text x="462" y="141" fill="#7d867f" font-size="10">booking requests</text>
+    <!-- gmail -->
+    <rect x="528" y="185" width="160" height="50" rx="10" fill="#e7ecdc"/><text x="608" y="207" text-anchor="middle" fill="#4d5c37" font-weight="700" font-size="12">Gmail (SMTP)</text><text x="608" y="223" text-anchor="middle" fill="#4d5c37" font-size="10">cabecoreservations@</text>
+    <line x1="452" y1="195" x2="526" y2="208" stroke="#7d867f" stroke-width="1.5" marker-end="url(#ar)"/>
+    <!-- guest -->
+    <rect x="528" y="265" width="160" height="44" rx="10" fill="#fffdf9" stroke="#e6dfd2"/><text x="608" y="292" text-anchor="middle" fill="#1f2a24" font-weight="600">Guest's inbox</text>
+    <line x1="608" y1="237" x2="608" y2="263" stroke="#7d867f" stroke-width="1.5" marker-end="url(#ar)"/>
+    <!-- github -->
+    <rect x="250" y="265" width="200" height="44" rx="10" fill="#fff" stroke="#e6dfd2" stroke-dasharray="4 3"/><text x="350" y="285" text-anchor="middle" fill="#4a564f" font-weight="600">GitHub</text><text x="350" y="300" text-anchor="middle" fill="#7d867f" font-size="10">the code (not the data)</text>
+  </svg>
+  <table>
+    <tr><th>Piece</th><th>What it does</th><th>Built with</th></tr>
+    <tr><td>Dashboard</td><td>Everything you see and click: houses, calendar, bookings, connections, settings, people. It holds no data itself; it asks the server.</td><td>Plain HTML, CSS and JavaScript (<span class="mono">public/</span>)</td></tr>
+    <tr><td>Worker</td><td>Signs people in, stores and checks reservations, reads the Airbnb/Booking/website calendars, publishes Alpendre's own calendar links, receives website bookings and sends emails.</td><td>JavaScript on Cloudflare (<span class="mono">worker/index.js</span>)</td></tr>
+    <tr><td>Durable Object</td><td>Keeps all the data (houses, reservations, people, sessions, activity log) in Cloudflare's storage. Every request goes through it one at a time, so data never gets mixed up.</td><td>Cloudflare Durable Objects (SQLite)</td></tr>
+    <tr><td>Scheduler</td><td>Wakes the Worker every 5 minutes to sync the calendars, even when nobody has the app open.</td><td>Cloudflare Cron Trigger</td></tr>
+    <tr><td>Mail</td><td>Sends confirmation emails through Gmail with an app password, with the house logo embedded.</td><td><span class="mono">worker/mail.js</span> and a copy of the worker-mailer library</td></tr>
+    <tr><td>Booking widget / API</td><td>Lets any website show availability and take booking requests.</td><td><span class="mono">public/embed.js</span> and <span class="mono">/api/public/…</span></td></tr>
+  </table>
+</section>
+
+<!-- ===================== 3 TIMELINE ===================== -->
+<section>
+  <h2><span class="n">3</span>How it was made, step by step</h2>
+  <p class="lead">Each step was built, tested on this computer first (with a local copy of the server and sample calendars), then published. The decisions below explain why it works the way it does.</p>
+  <div class="tl">
+    <div class="step"><span class="date">13 Nov 2026 · step 1</span><h4>Name, logo and first version</h4><p>Named <b>Alpendre</b> (porch) with a logo of three porch arches under a tiled roof, one for each road a booking arrives by. Brand colours: ink green, cream, terracotta, olive and sun yellow, with the Fraunces and Inter typefaces. The first version managed one house, with a small guest booking page.</p></div>
+    <div class="step"><span class="date">step 2</span><h4>One workspace per house</h4><p>Reworked into a platform where each house is its own workspace with its own Airbnb, Booking.com and website connections. Added the "All houses" home with house cards and a timeline. <span class="why">Why: you manage several houses, and your own website already existed, so the built-in guest page was replaced by a way to connect any website.</span></p></div>
+    <div class="step"><span class="date">step 3</span><h4>Live on GitHub Pages and Cloudflare</h4><p>The server was rewritten to run on Cloudflare Workers with a Durable Object for the data, and the dashboard published on GitHub Pages. <span class="why">Why: GitHub Pages cannot run a server. Cloudflare's free plan is always on, never sleeps, and can run the sync on a schedule.</span> Sign-in moved to tokens because the dashboard and the server live on different addresses. The owner password became a Cloudflare secret.</p></div>
+    <div class="step"><span class="date">step 4</span><h4>Personal accounts and invites</h4><p>Each person has their own username and password. New people join through a single-use invite link and choose their own password, so nobody else ever sees it. The activity log records who did what. Tomás Martins Dias was invited this way.</p></div>
+    <div class="step"><span class="date">step 5</span><h4>Each person sees only their own houses</h4><p>Houses belong to whoever creates them. The owner account sees all houses and can move a house to someone else. Managing people became owner-only. <span class="why">Why: otherwise anyone could reset another person's password and get into their houses.</span> A flaw where two overlapping requests could act as the wrong person was found during testing and fixed.</p></div>
+    <div class="step"><span class="date">step 6</span><h4>Sync every 5 minutes</h4><p>Alpendre checks the Airbnb, Booking.com and website calendars every 5 minutes. <span class="why">Airbnb and Booking.com read Alpendre's links on their own schedule (usually every 1–3 hours), which nobody outside can change. Truly live sync needs a certified channel manager.</span></p></div>
+    <div class="step"><span class="date">step 7</span><h4>The Quinta do Cabeço website connected</h4><p>The website's own booking section (PT/EN, monthly prices, deposit) was kept and connected behind the scenes: its calendar reads Alpendre's availability and its form sends requests into Alpendre, with the price the guest saw.</p></div>
+    <div class="step"><span class="date">step 8</span><h4>Confirmation emails</h4><p>Confirming a booking emails the guest in their language, sent through Gmail with an app password. The first account was blocked by a Google security check, so the sender became <span class="mono">cabecoreservations@gmail.com</span>.</p></div>
+    <div class="step"><span class="date">step 9</span><h4>iPhone app and phone layout</h4><p>Alpendre can be added to the iPhone home screen as an app with its own icon. The phone layout got a top bar with a house switcher, bottom tabs, a + button, booking cards and a calendar with a list of stays, with every desktop feature within one or two taps.</p></div>
+    <div class="step"><span class="date">13–16 Nov 2026 · step 10</span><h4>Logo in the email</h4><p>A per-house "Logo in emails" setting. The logo is embedded inside the email so it shows even when email apps block images. The dashboard's files were given version numbers so phones always load the newest copy.</p></div>
+  </div>
+</section>
+
+<!-- ===================== 4 FEATURES ===================== -->
+<section>
+  <h2><span class="n">4</span>Using the app: every feature</h2>
+  <h3>All houses (home)</h3>
+  <ul>
+    <li><b>Summary numbers:</b> number of houses, how booked the next 30 days are, arrivals in the next 7 days, website requests waiting, double bookings.</li>
+    <li><b>House cards:</b> this month's occupancy, whether the house is occupied tonight, the next arrival, and which connections work (green), fail (red) or are missing (grey). The owner also sees who each house belongs to.</li>
+    <li><b>Timeline:</b> every house side by side for 4 weeks, coloured by channel. Use the arrows to move.</li>
+    <li><b>Coming and going</b> (next 7 days) and <b>Needs attention</b> (double bookings, requests to answer, failed syncs, unconnected channels).</li>
+  </ul>
+  <h3>Inside a house</h3>
+  <table>
+    <tr><th>Section</th><th>What you can do</th></tr>
+    <tr><td>Overview</td><td>Occupancy and revenue this month, arrivals, website requests, the next 14 days, alerts, and where bookings come from.</td></tr>
+    <tr><td>Calendar</td><td>The month with every stay coloured by channel: <span class="tag airbnb">Airbnb</span> <span class="tag booking">Booking.com</span> <span class="tag web">Website</span> <span class="tag manual">Manual</span>. Click a stay to open it, or an empty day to add one. Striped bars are pending requests; red outlines are double bookings.</td></tr>
+    <tr><td>Reservations</td><td>Search by guest, email or reference; filter by upcoming/past, channel and status.</td></tr>
+    <tr><td>Connections</td><td>Airbnb, Booking.com and website links (see sections 5 and 6), "Sync this house now", the activity log, and "Replace export links".</td></tr>
+    <tr><td>House settings</td><td>Name, location, colour, check-in/out times, who it belongs to (owner only), website booking rules (price, cleaning fee, minimum nights, max guests, currency, auto-confirm), the confirmation email's extra message and logo, and deleting the house.</td></tr>
+  </table>
+  <h3>A reservation</h3>
+  <ul>
+    <li>Open any stay to edit the guest name, email, phone, guests, total, reference, notes and status (<i>confirmed, pending, blocked, cancelled</i>).</li>
+    <li>Stays imported from Airbnb/Booking.com keep the channel's dates (they update on every sync). Guest details are yours to add, and they are kept.</li>
+    <li><b>Website requests</b> arrive as <i>pending</i>, with <b>Confirm booking</b> and <b>Decline</b> buttons. Confirming can email the guest (section 8).</li>
+  </ul>
+  <h3>Settings (owner)</h3>
+  <p><b>People</b> (invite, new link or password reset, remove), <b>Calendar sync</b> interval (5, 15, 30 minutes, 1 or 3 hours), <b>Guest emails</b> status, and <b>Remove demo houses</b>. Everyone else sees <b>My account</b> with "Change my password".</p>
+</section>
+
+<!-- ===================== 5 SYNC ===================== -->
+<section>
+  <h2><span class="n">5</span>Calendar sync with Airbnb and Booking.com</h2>
+  <p class="lead">Neither platform offers an open API to small hosts. Both support <b>calendar sync (iCal)</b>, and Alpendre uses it in both directions for each house.</p>
+  <div class="grid2">
+    <div class="box"><h4>1 · Import (their bookings into Alpendre)</h4>Copy the export link from the platform and paste it into Alpendre (house → Connections).<br><br><b>Airbnb:</b> Calendar → listing → Availability → Connect calendars → Export calendar.<br><b>Booking.com:</b> Extranet → Rates &amp; Availability → Sync calendars → Export.</div>
+    <div class="box"><h4>2 · Export (Alpendre's bookings onto them)</h4>Copy Alpendre's link for that channel and paste it into the platform's <i>Import calendar</i>, named "Alpendre". Each link lists the nights booked <b>everywhere else</b>, so the platform never sells them twice.</div>
+  </div>
+  <table>
+    <tr><th>Direction</th><th>How fast</th></tr>
+    <tr><td>Website → Alpendre</td><td>Instant (the website writes straight into Alpendre)</td></tr>
+    <tr><td>Alpendre → website</td><td>Instant (the website reads availability live)</td></tr>
+    <tr><td>Airbnb / Booking → Alpendre</td><td>Up to 5 minutes (or press Sync now)</td></tr>
+    <tr><td>Alpendre → Airbnb / Booking</td><td>Usually 1–3 hours, on their schedule</td></tr>
+  </table>
+  <h3>What the sync does, and doesn't</h3>
+  <ul>
+    <li>Calendar links carry <b>dates and a reference only</b>, never guest names or prices. Add those yourself; later syncs keep them.</li>
+    <li>"Not available" or "Closed" entries are imported as <b>blocked</b> dates.</li>
+    <li>A stay that disappears from a channel's calendar is marked <b>cancelled</b>.</li>
+    <li>Overlapping stays in a house are flagged as a <b>double booking</b> in red everywhere.</li>
+    <li>Alpendre ignores its own dates when a channel sends them back, and refuses to import its own link (which would loop).</li>
+  </ul>
+  <div class="box warn"><h4>The 1–3 hour gap</h4>Two guests could book the same nights on different platforms before they refresh. Alpendre flags it immediately but cannot prevent it. To reduce the risk, avoid same-day bookings and use Sync now after a booking. Only a certified channel manager (for example Beds24 or Smoobu, about €10–30 per property per month) gives near-live sync.</div>
+  <div class="box tip"><h4>If an export link leaks</h4>House → Connections → "Export links leaked?" → <b>Replace export links</b>. The old links stop working; paste the new ones into Airbnb, Booking.com and the website.</div>
+</section>
+
+<!-- ===================== 6 WEBSITE ===================== -->
+<section>
+  <h2><span class="n">6</span>The Quinta do Cabeço website connection</h2>
+  <p class="lead">The website kept its own design and bilingual booking section, and talks to Alpendre through its public API.</p>
+  <ul>
+    <li>Its calendar shows Alpendre's availability (Airbnb, Booking.com and direct bookings together). If Alpendre cannot be reached, it falls back to the site's own files.</li>
+    <li>Its form sends each request into Alpendre as a <b>pending website reservation</b>, with the price shown to the guest (the site's monthly prices plus cleaning), adults and children, the deposit and method, the guest's language, and a reference like <span class="mono">WEB-1A2B3C</span>.</li>
+    <li>Two guests cannot request the same dates: the second is told they are taken.</li>
+  </ul>
+  <h3>Where it is set</h3>
+  <p>In the website's <span class="mono">script.js</span>, the <span class="mono">SITE.alpendre</span> setting holds the server address and the house's <b>public key</b>:</p>
+<pre>alpendre: {
+  api: 'https://alpendre.houseguests.workers.dev',
+  key: 'pk_597b87235e444e064a75aa10',   <span class="c">// Quinta do Cabeço's public key</span>
+},</pre>
+  <p>The public key comes from Alpendre → house → Connections → Your website → API. It is safe to show; it only allows reading availability and sending requests. Remove the key and the site works as before (requests by email).</p>
+  <div class="box key"><h4>Keep these in step</h4>The Alpendre house settings must match the website's <span class="mono">CONFIG</span>: <b>minimum 3 nights</b> and <b>up to 8 guests</b>. Otherwise Alpendre refuses some requests the site allows.</div>
+  <h3>Other ways to connect a website (for future houses)</h3>
+  <table>
+    <tr><th>Option</th><th>When to use it</th></tr>
+    <tr><td>Booking widget</td><td>A site with no booking system (WordPress, Wix, Squarespace, plain HTML). Paste the two-line snippet from Connections; add <span class="mono">data-mode="calendar"</span> for availability only or <span class="mono">data-accent="#hex"</span> for your colours.</td></tr>
+    <tr><td>Calendar sync</td><td>A site whose booking plugin has an iCal link: exchange links like with Airbnb.</td></tr>
+    <tr><td>API</td><td>A custom site (like Quinta do Cabeço): <span class="mono">GET /api/public/&lt;key&gt;/availability</span> and <span class="mono">POST /api/public/&lt;key&gt;/book</span>.</td></tr>
+  </table>
+</section>
+
+<!-- ===================== 7 PEOPLE ===================== -->
+<section>
+  <h2><span class="n">7</span>People, access and security</h2>
+  <table>
+    <tr><th>Account</th><th>Signs in with</th><th>Sees and can do</th></tr>
+    <tr><td>Owner</td><td>Username <b>empty</b> + the owner password</td><td>Every house (with owner names), move houses between people, invite/reset/remove people, sync interval, demo data</td></tr>
+    <tr><td>Invited people (e.g. Tomás, username <span class="mono">tomas</span>)</td><td>Their username or email + their own password</td><td>Only their own houses (ones they add or the owner moves to them), with full control of those; change their own password</td></tr>
+  </table>
+  <h3>Inviting someone</h3>
+  <ol>
+    <li>Settings → People → <b>+ Invite a person</b>: full name (username fills in), optional email.</li>
+    <li>Copy the link (or "Write an email with the link") and send it only to that person.</li>
+    <li>They open it, choose a password (at least 8 characters) and are signed in. The link works once and expires after 7 days.</li>
+    <li>Lost link or forgotten password: <b>New link</b> / <b>Reset password</b> next to their name. Removing someone signs them out at once and hands their houses to the owner.</li>
+  </ol>
+  <h3>How it is protected</h3>
+  <ul>
+    <li>Passwords are stored only as strong hashes (PBKDF2). Nobody can read them back, including the app.</li>
+    <li>Sign-ins last 30 days. Wrong passwords are slowed down.</li>
+    <li>Only the GitHub Pages dashboard (and this computer, for testing) may use the owner API from a browser.</li>
+    <li>Every request checks who is signed in and which houses they may touch. This was tested with 27 automatic checks, including overlapping requests.</li>
+  </ul>
+  <h3>Secrets: names only, never written down here</h3>
+  <table>
+    <tr><th>Secret (in Cloudflare)</th><th>What it is</th><th>How to change it</th></tr>
+    <tr><td><span class="mono">ALPENDRE_PASSWORD</span></td><td>The owner password</td><td><span class="mono">npx wrangler secret put ALPENDRE_PASSWORD</span></td></tr>
+    <tr><td><span class="mono">GMAIL_APP_PASSWORD</span></td><td>Google app password for cabecoreservations@gmail.com</td><td><span class="mono">npx wrangler secret put GMAIL_APP_PASSWORD</span></td></tr>
+  </table>
+  <p>Run those in the project folder; type the value into the terminal prompt (nothing shows while you type) and wait for "Success".</p>
+</section>
+
+<!-- ===================== 8 EMAIL ===================== -->
+<section>
+  <h2><span class="n">8</span>Confirmation emails</h2>
+  <p class="lead">When you click <b>Confirm booking</b>, the guest receives an email from <span class="mono">cabecoreservations@gmail.com</span> in the language they used on the website (Portuguese or English).</p>
+  <div class="grid2">
+    <div>
+      <h3 style="margin-top:0">What the email contains</h3>
+      <ul>
+        <li>The house logo at the top (embedded in the email)</li>
+        <li>Arrival and departure with check-in and check-out times</li>
+        <li>Nights, guests, total and the booking reference</li>
+        <li>The house's extra message (for example deposit instructions, address, who to call)</li>
+        <li>Replies go to the Gmail inbox</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Controls</h3>
+      <ul>
+        <li>Untick "Email … a confirmation" before confirming to skip it</li>
+        <li><b>Send again</b> on confirmed stays</li>
+        <li>If sending fails, the booking is still confirmed and the reason is shown</li>
+        <li>Settings → Guest emails shows whether sending is set up</li>
+      </ul>
+    </div>
+  </div>
+  <h3>Per-house settings</h3>
+  <p>House settings → <b>Confirmation email</b>: <b>Logo in emails</b> (a https link to a PNG or JPG; Quinta do Cabeço uses <span class="mono">…/quintadocabeco/images/brand/logo-email.png</span>, a cropped copy on the cream background so it stays visible in dark mode) and <b>Extra message</b>.</p>
+  <h3>The Gmail app password</h3>
+  <ol>
+    <li>Signed in as cabecoreservations@gmail.com, turn on <b>2-Step Verification</b>.</li>
+    <li>Create an app password named "Alpendre" at <span class="mono">myaccount.google.com/apppasswords</span> (16 letters).</li>
+    <li>Save it with <span class="mono">npx wrangler secret put GMAIL_APP_PASSWORD</span>. Check there are 16 asterisks before pressing Enter.</li>
+  </ol>
+  <div class="box warn"><h4>Emails stop if…</h4>…the Gmail account's password changes, 2-Step Verification is turned off, or the "Alpendre" app password is deleted. Create a new app password and save it again. If Google says it can't confirm it's you, try from your usual phone or computer on home Wi-Fi, or wait a day or two.</div>
+</section>
+
+<!-- ===================== 9 IPHONE ===================== -->
+<section>
+  <h2><span class="n">9</span>The iPhone app</h2>
+  <div class="grid2">
+    <div>
+      <h3 style="margin-top:0">Install it</h3>
+      <ol>
+        <li>Open <b>Safari</b> (not Chrome) at <span class="mono">inesdias028.github.io/alpendre</span>.</li>
+        <li>Tap <b>Share</b> → <b>Add to Home Screen</b> → <b>Add</b>.</li>
+        <li>Open it from the icon and sign in once. It stays signed in for 30 days.</li>
+      </ol>
+      <p>It opens full-screen without Safari's bars, with the porch logo as icon. Tomás installs it the same way.</p>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Find your way</h3>
+      <table>
+        <tr><td>Top bar</td><td>House switcher (with warnings and waiting requests) and the sync button</td></tr>
+        <tr><td>All houses</td><td>Home, with the total of waiting requests</td></tr>
+        <tr><td>House tab</td><td>That house's overview</td></tr>
+        <tr><td>Calendar / Bookings</td><td>Month with tappable stays / searchable cards</td></tr>
+        <tr><td>More</td><td>Connections, House settings, Switch house, Settings, Add a house, Sign out</td></tr>
+        <tr><td>Orange +</td><td>New reservation</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="box tip"><h4>After an update</h4>Swipe the app closed and reopen it. The dashboard's files carry version numbers, so it loads the newest copy.</div>
+  <p>It is a web app: it needs an internet connection and does not send push notifications.</p>
+
+</section>
+<section>
+    <h2><span class="n">10</span>Running and updating the app</h2>
+    <p>Needs Node.js 18 or newer on the computer. In <span class="mono">C:\Users\inesm\workspace\alpendre</span>:</p>
+<pre><span class="c"># try changes on this computer (local copy with demo data, password "alpendre")</span>
+npm run dev
+
+<span class="c"># publish the server (API, sync, emails) to Cloudflare</span>
+npm run deploy
+
+<span class="c"># publish the dashboard to GitHub Pages (commit your changes first)</span>
+npm run deploy:pages
+
+<span class="c"># sign in to Cloudflare again if asked</span>
+npx wrangler login</pre>
+    <table>
+      <tr><th>File or folder</th><th>What it is</th></tr>
+      <tr><td><span class="mono">worker/index.js</span></td><td>The server: API, data, sync, calendar links, people, website bookings</td></tr>
+      <tr><td><span class="mono">worker/mail.js</span>, <span class="mono">worker/vendor/</span></td><td>Confirmation emails, and the mail library copy (MIT) with embedded images. Its line endings must stay as they are (<span class="mono">.gitattributes</span> keeps them)</td></tr>
+      <tr><td><span class="mono">public/</span></td><td>The dashboard: <span class="mono">index.html</span>, <span class="mono">app.js</span>, <span class="mono">app.css</span>, <span class="mono">brand.css</span>, <span class="mono">embed.js</span> (widget), icons, manifest</td></tr>
+      <tr><td><span class="mono">public/config.js</span></td><td>Where the dashboard finds the server</td></tr>
+      <tr><td><span class="mono">wrangler.toml</span></td><td>Cloudflare settings: the 5-minute schedule, allowed dashboard address, sending Gmail address</td></tr>
+      <tr><td><span class="mono">scripts/deploy-pages.js</span></td><td>Publishes <span class="mono">public/</span> to the <span class="mono">gh-pages</span> branch</td></tr>
+    </table>
+    <div class="box key"><h4>When you change the dashboard</h4>Update the <span class="mono">?v=…</span> numbers in <span class="mono">public/index.html</span> so browsers and the iPhone app fetch the new files.</div>
+</section>
+
+<!-- ===================== 11–13 ===================== -->
+<section>
+  <h2><span class="n">11</span>Costs and limits</h2>
+  <table>
+    <tr><th>Service</th><th>Cost</th><th>Limits that matter</th></tr>
+    <tr><td>GitHub Pages</td><td>Free</td><td>Static files only; updates take 1–2 minutes and can be cached for up to 10 minutes</td></tr>
+    <tr><td>Cloudflare Workers + Durable Objects</td><td>Free plan</td><td>Plenty for a handful of houses; one sync reads up to about 50 calendar links (about 16 houses with 3 channels each)</td></tr>
+    <tr><td>Gmail</td><td>Free</td><td>About 500 emails a day</td></tr>
+    <tr><td>Airbnb / Booking.com calendar sync</td><td>Free</td><td>Dates only; they refresh every 1–3 hours</td></tr>
+  </table>
+
+  <section class="flow">
+    <h2><span class="n">12</span>Troubleshooting</h2>
+    <table>
+      <tr><th>What you see</th><th>What to do</th></tr>
+      <tr><td>"Wrong username or password"</td><td>Owner: leave the username empty. Others: ask the owner for <b>Reset password</b>.</td></tr>
+      <tr><td>A connection is red</td><td>House → Connections shows the error. Check the link was copied completely; press Sync this house now.</td></tr>
+      <tr><td>Double booking alert</td><td>Open the stays and cancel one on its own channel (Airbnb/Booking/website).</td></tr>
+      <tr><td>"Gmail refused the login"</td><td>The app password is wrong or was removed: create a new one and save it again (section 8).</td></tr>
+      <tr><td>Email without the logo</td><td>The house has no logo link saved: House settings → Logo in emails, then Save.</td></tr>
+      <tr><td>Email in Spam</td><td>Mark it "Not spam"; future emails go to the inbox.</td></tr>
+      <tr><td>The app looks old or a field is missing</td><td>Reload the page, or close and reopen the iPhone app.</td></tr>
+      <tr><td>Website says dates are available but Alpendre doesn't</td><td>Wait a few seconds and reload: the site reads Alpendre live. Check the house's minimum nights and max guests match the site.</td></tr>
+      <tr><td>A request was refused on the website</td><td>House → Connections → Your website → Booking widget: "Accept booking requests from my website" must be ticked. Also check minimum nights and max guests.</td></tr>
+    </table>
+  </section>
+
+</section>
+<section>
+    <h2><span class="n">13</span>Ideas for later</h2>
+    <ul>
+      <li><b>More emails:</b> one to you when a website request arrives, a decline email to the guest, and reminders before arrival.</li>
+      <li><b>Online deposit payment</b> (MB WAY, Multibanco, card), for example with easypay, already prepared in the website code.</li>
+      <li><b>Channel manager</b> (Beds24 or Smoobu) for near-live Airbnb/Booking sync with names and prices; <b>shared houses</b> and view-only roles (for cleaners, for example).</li>
+    </ul>
+
+<!-- ===================== QUICK REFERENCE ===================== -->
+<section class="flow">
+  <h2><span class="n">A</span>Quick reference card</h2>
+  <div class="grid2">
+    <div class="box"><h4>Addresses</h4><div class="kv" style="grid-template-columns:24mm 1fr;margin:0">
+      <b>Dashboard</b><span>inesdias028.github.io/alpendre</span>
+      <b>Server</b><span>alpendre.houseguests.workers.dev</span>
+      <b>Website</b><span>qtcabecoavocados.github.io/quintadocabeco</span>
+      <b>Code</b><span>github.com/inesdias028/alpendre</span>
+      <b>Emails from</b><span>cabecoreservations@gmail.com</span></div></div>
+    <div class="box"><h4>Daily use</h4><ul style="margin:0">
+      <li>New website request → open it → <b>Confirm booking</b> (email goes out) or <b>Decline</b></li>
+      <li>Airbnb/Booking stay → add the guest's name, phone and price</li>
+      <li>Red alert → double booking or a failed sync</li>
+      <li>Sync now → the round arrow</li></ul></div>
+    <div class="box"><h4>Setting up a new house</h4><ol style="margin:0">
+      <li>+ Add a house (name, location, colour, rules)</li>
+      <li>Connections: Airbnb and Booking.com links both ways</li>
+      <li>Connect the website (widget, calendar or API)</li>
+      <li>House settings: logo and message for emails</li>
+      <li>Owner: move it to the right person if needed</li></ol></div>
+    <div class="box"><h4>Commands (in the alpendre folder)</h4><div class="mono" style="display:block;background:none;padding:0;line-height:1.9">npm run dev<br>npm run deploy<br>npm run deploy:pages<br>npx wrangler login<br>npx wrangler secret put ALPENDRE_PASSWORD<br>npx wrangler secret put GMAIL_APP_PASSWORD</div></div>
+  </div>
+  <div class="box tip"><h4>Golden rules</h4>Never write passwords in chat, email or documents · keep the house's minimum nights and max guests the same as the website · use Alpendre's links in Airbnb and Booking.com, not the website's old calendar file · after changing the dashboard, update the <span class="mono">?v=</span> numbers and publish both parts.</div>
+</section>
+
+</body>
+</html>

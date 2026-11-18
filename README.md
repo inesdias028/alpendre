@@ -2,6 +2,8 @@
 
 **Every booking, one porch.**
 
+📘 **[The complete guide (PDF)](docs/Alpendre-guide.pdf)**: how the app was made, every feature, and how to run, update and fix it. Its source is [docs/guide.html](docs/guide.html) (print it to PDF with Chrome to update the guide).
+
 *Alpendre* is Portuguese for porch, the place where every guest arrives, whatever road they took to get there. Alpendre is a platform for managing several holiday houses. Each house is its own **workspace**, connected to **Airbnb**, **Booking.com** and **your own website**, with calendars kept in sync and every reservation in one place.
 
 ## What's inside
